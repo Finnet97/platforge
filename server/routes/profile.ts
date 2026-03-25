@@ -25,8 +25,22 @@ router.get("/:username", async (req, res) => {
 
     res.json({ profile, trophies, accountId });
   } catch (err: any) {
-    const status = err.message?.includes("not found") ? 404 : 500;
-    res.status(status).json({ error: err.message || "Failed to fetch profile." });
+    const msg = err.message || "Failed to fetch profile.";
+    console.error("[profile] Error:", msg);
+    if (err.cause) console.error("[profile] Cause:", err.cause);
+
+    let status = 500;
+    let userMessage = msg;
+    if (msg.includes("not found")) status = 404;
+    if (msg === "fetch failed" || msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT")) {
+      userMessage = "PSN API is unreachable. Please check your connection or try again later.";
+    }
+    if (msg.includes("expired") || msg.includes("Not authenticated")) {
+      status = 401;
+      userMessage = "Session expired. Please reconnect your PSN account.";
+    }
+
+    res.status(status).json({ error: userMessage });
   }
 });
 

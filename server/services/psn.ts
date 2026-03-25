@@ -23,9 +23,27 @@ export function isAuthenticated(): boolean {
 
 export async function authenticate(npsso: string): Promise<void> {
   const { exchangeNpssoForAccessCode, exchangeAccessCodeForAuthTokens } = await getPsnApi();
-  const accessCode = await exchangeNpssoForAccessCode(npsso);
-  authTokens = await exchangeAccessCodeForAuthTokens(accessCode);
-  authExpiresAt = Date.now() + authTokens.expiresIn * 1000;
+  let accessCode: string;
+  try {
+    accessCode = await exchangeNpssoForAccessCode(npsso);
+  } catch (err: any) {
+    const msg = err.message || "";
+    console.error("[psn] exchangeNpssoForAccessCode failed:", msg);
+    if (msg === "fetch failed" || msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT")) {
+      throw new Error("Cannot reach PSN servers. Check your internet connection and try again.");
+    }
+    if (msg.includes("Invalid NPSSO") || msg.includes("401") || msg.includes("grant_code") || msg.includes("access code") || msg.includes("NPSSO")) {
+      throw new Error("NPSSO token is invalid or expired. Please get a fresh token from ca.account.sony.com/api/v1/ssocookie");
+    }
+    throw new Error(`Authentication failed: ${msg}`);
+  }
+  try {
+    authTokens = await exchangeAccessCodeForAuthTokens(accessCode);
+    authExpiresAt = Date.now() + authTokens.expiresIn * 1000;
+  } catch (err: any) {
+    console.error("[psn] exchangeAccessCodeForAuthTokens failed:", err.message);
+    throw new Error("Failed to exchange access code for tokens. The NPSSO token may have expired.");
+  }
 }
 
 export async function getAuth(): Promise<AuthorizationPayload> {
@@ -56,7 +74,12 @@ export function clearAuth(): void {
 
 export async function searchUser(username: string): Promise<string> {
   const { getProfileFromUserName, makeUniversalSearch } = await getPsnApi();
-  const auth = await getAuth();
+  let auth;
+  try {
+    auth = await getAuth();
+  } catch (err: any) {
+    throw new Error(err.message || "Authentication failed");
+  }
 
   // 1. Try exact lookup via legacy API (handles underscores and special chars)
   try {

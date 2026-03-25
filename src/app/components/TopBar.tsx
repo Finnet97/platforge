@@ -9,10 +9,11 @@ interface TopBarProps {
   onShowYearInReview: () => void;
   onShowCompare: () => void;
   onShowAuth: () => void;
+  onExport: (format: 'png' | 'jpeg') => void;
 }
 
-export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onShowAuth }: TopBarProps) {
-  const { isAuthenticated, isLoading, loadingProgress, loadProfile, profile } = usePsnData();
+export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onShowAuth, onExport }: TopBarProps) {
+  const { isAuthenticated, isLoading, loadingProgress, loadProfile, profile, error } = usePsnData();
   const [psnInput, setPsnInput] = useState(profile.username);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
         </div>
 
         {/* Center - PSN ID Input */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="relative flex items-center gap-2 flex-shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A9BB8]" />
             <input
@@ -59,7 +60,9 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
               value={psnInput}
               onChange={(e) => setPsnInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-64 h-9 bg-[#12172A] border border-[#1E2740] rounded-lg pl-9 pr-3 text-sm text-white placeholder-[#8A9BB8] focus:outline-none focus:border-[#FFD700] transition-colors"
+              className={`w-64 h-9 bg-[#12172A] border rounded-lg pl-9 pr-3 text-sm text-white placeholder-[#8A9BB8] focus:outline-none focus:border-[#FFD700] transition-colors ${
+                error ? 'border-red-500/50' : 'border-[#1E2740]'
+              }`}
               style={{ fontFamily: 'Inter, sans-serif' }}
             />
           </div>
@@ -72,6 +75,13 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Load Profile
           </button>
+          {error && (
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-lg max-w-md z-20">
+              <p className="text-xs text-red-400 whitespace-nowrap" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {error}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right - Action Buttons */}
@@ -126,14 +136,19 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
                 className="min-w-[180px] bg-[#12172A] border border-[#1E2740] rounded-lg p-1.5 shadow-xl z-50"
                 sideOffset={5}
               >
-                <DropdownMenu.Item className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+                <DropdownMenu.Item
+                  className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                  onSelect={() => onExport('png')}
+                >
                   Export as PNG
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  Export as GIF
-                </DropdownMenu.Item>
-                <DropdownMenu.Item className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  Export as 4K
+                <DropdownMenu.Item
+                  className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                  onSelect={() => onExport('jpeg')}
+                >
+                  Export as JPEG
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>

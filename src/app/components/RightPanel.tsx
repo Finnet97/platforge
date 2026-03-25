@@ -1,14 +1,16 @@
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import { GripVertical, Gamepad2, Clock, TrendingUp, Calendar } from 'lucide-react';
 import { usePsnData } from '../context/PsnDataContext';
+import type { Trophy } from '../data/mockData';
 
 interface RightPanelProps {
   selectedTile: number | null;
+  processedTrophies: Trophy[];
 }
 
-export function RightPanel({ selectedTile }: RightPanelProps) {
-  const { trophies, profile } = usePsnData();
-  const selectedTrophy = selectedTile !== null ? trophies[selectedTile] : trophies[0];
+export function RightPanel({ selectedTile, processedTrophies }: RightPanelProps) {
+  const { profile } = usePsnData();
+  const selectedTrophy = selectedTile !== null ? processedTrophies[selectedTile] : processedTrophies[0];
   if (!selectedTrophy) return null;
 
   const getRarityColor = (rarity: number) => {
@@ -145,7 +147,7 @@ export function RightPanel({ selectedTile }: RightPanelProps) {
               </h3>
               
               <div className="space-y-2">
-                {trophies.slice(0, 25).map((trophy, index) => (
+                {processedTrophies.slice(0, 25).map((trophy, index) => (
                   <div
                     key={trophy.id}
                     className={`flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all ${

@@ -1,19 +1,34 @@
-import { X, Search, Trophy, Star, TrendingUp, Award } from 'lucide-react';
+import { useState } from 'react';
+import { X, Search, Trophy, Star, TrendingUp, Award, Loader2 } from 'lucide-react';
 import { usePsnData } from '../context/PsnDataContext';
+import { fetchJson } from '../services/api';
 import { mockTrophies } from '../data/mockData';
+import type { Trophy as TrophyType } from '../data/mockData';
 
 interface CompareModeProps {
   onClose: () => void;
 }
 
+interface CompareUser {
+  username: string;
+  totalPlatinums: number;
+  rarestPlatinum: TrophyType | null;
+  avgRarity: number;
+  trophies: TrophyType[];
+}
+
 export function CompareMode({ onClose }: CompareModeProps) {
-  const { trophies, profile } = usePsnData();
+  const { trophies, profile, isAuthenticated } = usePsnData();
+  const [user2Input, setUser2Input] = useState('');
+  const [user2Data, setUser2Data] = useState<CompareUser | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const avgRarity1 = trophies.length > 0
     ? trophies.reduce((sum, t) => sum + t.rarity, 0) / trophies.length
     : 0;
 
-  const user1 = {
+  const user1: CompareUser = {
     username: profile.username,
     totalPlatinums: profile.totalPlatinums,
     rarestPlatinum: profile.rarestPlatinum,
@@ -21,15 +36,46 @@ export function CompareMode({ onClose }: CompareModeProps) {
     trophies: trophies.slice(0, 16)
   };
 
-  const user2 = {
+  // Fallback user2 when no real data loaded
+  const user2: CompareUser = user2Data || {
     username: "GamerPro_2024",
     totalPlatinums: 98,
-    rarestPlatinum: mockTrophies[12], // Returnal
+    rarestPlatinum: mockTrophies[12],
     avgRarity: 12.3,
     trophies: mockTrophies.slice(3, 19)
   };
 
-  // Find common platinums
+  const loadUser2 = async () => {
+    const username = user2Input.trim();
+    if (!username) return;
+    if (!isAuthenticated) {
+      setError('Connect PSN first to search users');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchJson<{
+        profile: { username: string; psnLevel: number; totalPlatinums: number; avatar: string; rarestPlatinum: TrophyType | null };
+        trophies: TrophyType[];
+      }>(`/profile/${encodeURIComponent(username)}`);
+      const avgR = data.trophies.length > 0
+        ? data.trophies.reduce((sum, t) => sum + t.rarity, 0) / data.trophies.length
+        : 0;
+      setUser2Data({
+        username: data.profile.username,
+        totalPlatinums: data.profile.totalPlatinums,
+        rarestPlatinum: data.profile.rarestPlatinum,
+        avgRarity: Math.round(avgR * 10) / 10,
+        trophies: data.trophies.slice(0, 16)
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const commonTrophies = user1.trophies.filter(t1 =>
     user2.trophies.some(t2 => t2.gameTitle === t1.gameTitle)
   );
@@ -37,7 +83,7 @@ export function CompareMode({ onClose }: CompareModeProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/70 backdrop-blur-md"
         onClick={onClose}
       />
@@ -70,8 +116,9 @@ export function CompareMode({ onClose }: CompareModeProps) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A9BB8]" />
                 <input
                   type="text"
-                  defaultValue={user1.username}
-                  className="w-full h-11 bg-[#0A0E1A] border border-[#1E2740] rounded-lg pl-10 pr-4 text-sm text-white placeholder-[#8A9BB8] focus:outline-none focus:border-[#FFD700] transition-colors"
+                  value={user1.username}
+                  readOnly
+                  className="w-full h-11 bg-[#0A0E1A] border border-[#1E2740] rounded-lg pl-10 pr-4 text-sm text-white/60 cursor-not-allowed"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 />
               </div>
@@ -82,15 +129,32 @@ export function CompareMode({ onClose }: CompareModeProps) {
               <label className="text-xs text-[#8A9BB8] mb-2 block font-semibold uppercase tracking-wider" style={{ fontFamily: 'Inter, sans-serif' }}>
                 Player 2 PSN ID
               </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A9BB8]" />
-                <input
-                  type="text"
-                  defaultValue={user2.username}
-                  className="w-full h-11 bg-[#0A0E1A] border border-[#1E2740] rounded-lg pl-10 pr-4 text-sm text-white placeholder-[#8A9BB8] focus:outline-none focus:border-[#FFD700] transition-colors"
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A9BB8]" />
+                  <input
+                    type="text"
+                    value={user2Input}
+                    onChange={(e) => setUser2Input(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && loadUser2()}
+                    placeholder="Enter PSN ID..."
+                    className="w-full h-11 bg-[#0A0E1A] border border-[#1E2740] rounded-lg pl-10 pr-4 text-sm text-white placeholder-[#8A9BB8] focus:outline-none focus:border-[#FFD700] transition-colors"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  />
+                </div>
+                <button
+                  onClick={loadUser2}
+                  disabled={loading || !user2Input.trim()}
+                  className="h-11 px-4 bg-[#FFD700] text-[#0A0E1A] rounded-lg text-sm font-semibold hover:bg-[#FFE44D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   style={{ fontFamily: 'Inter, sans-serif' }}
-                />
+                >
+                  {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Load
+                </button>
               </div>
+              {error && (
+                <p className="text-xs text-red-400 mt-2" style={{ fontFamily: 'Inter, sans-serif' }}>{error}</p>
+              )}
             </div>
           </div>
 
@@ -127,6 +191,7 @@ export function CompareMode({ onClose }: CompareModeProps) {
               <div className="text-center mb-5">
                 <h3 className="text-xl font-bold text-white mb-1 leading-tight" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
                   {user2.username}
+                  {user2Data && <span className="ml-2 text-xs text-green-400">(Live)</span>}
                 </h3>
                 <p className="text-sm text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
                   {user2.totalPlatinums} Platinums
@@ -154,7 +219,7 @@ export function CompareMode({ onClose }: CompareModeProps) {
             <h3 className="text-lg font-bold text-white mb-5" style={{ fontFamily: 'Orbitron, sans-serif' }}>
               Stats Comparison
             </h3>
-            
+
             <div className="space-y-5">
               {/* Total Platinums */}
               <div className="grid grid-cols-[1fr,auto,1fr] gap-5 items-center">
@@ -191,7 +256,7 @@ export function CompareMode({ onClose }: CompareModeProps) {
                 </div>
                 <div className="text-left">
                   <span className="text-3xl font-bold text-[#C0C0C0]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                    {user2.rarestPlatinum.rarity}%
+                    {user2.rarestPlatinum?.rarity ?? 0}%
                   </span>
                 </div>
               </div>
@@ -234,30 +299,32 @@ export function CompareMode({ onClose }: CompareModeProps) {
           </div>
 
           {/* Common Platinums Section */}
-          <div className="bg-[#12172A] border border-[#1E2740] rounded-xl p-6">
-            <h3 className="text-lg font-bold text-white mb-5" style={{ fontFamily: 'Orbitron, sans-serif' }}>
-              Shared Platinums
-            </h3>
-            
-            <div className="grid grid-cols-6 gap-3">
-              {commonTrophies.map((trophy) => (
-                <div
-                  key={trophy.id}
-                  className="relative aspect-square rounded-lg overflow-hidden border-2 border-[#FFD700]"
-                  style={{ boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)' }}
-                >
-                  <img
-                    src={trophy.imageUrl}
-                    alt={trophy.gameTitle}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-1 right-1 w-6 h-6 bg-[#FFD700] rounded-full flex items-center justify-center">
-                    <Award className="w-3.5 h-3.5 text-[#0A0E1A]" />
+          {commonTrophies.length > 0 && (
+            <div className="bg-[#12172A] border border-[#1E2740] rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-5" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+                Shared Platinums
+              </h3>
+
+              <div className="grid grid-cols-6 gap-3">
+                {commonTrophies.map((trophy) => (
+                  <div
+                    key={trophy.id}
+                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-[#FFD700]"
+                    style={{ boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)' }}
+                  >
+                    <img
+                      src={trophy.imageUrl}
+                      alt={trophy.gameTitle}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-1 right-1 w-6 h-6 bg-[#FFD700] rounded-full flex items-center justify-center">
+                      <Award className="w-3.5 h-3.5 text-[#0A0E1A]" />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

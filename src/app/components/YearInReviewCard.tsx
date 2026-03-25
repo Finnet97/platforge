@@ -5,10 +5,52 @@ interface YearInReviewCardProps {
   onClose: () => void;
 }
 
+function getMostActiveMonth(trophies: { dateEarned: string }[]): string {
+  if (trophies.length === 0) return '--';
+  const months: Record<string, number> = {};
+  for (const t of trophies) {
+    const month = t.dateEarned.split(' ')[0];
+    months[month] = (months[month] || 0) + 1;
+  }
+  return Object.entries(months).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function getFastestPlatinum(trophies: { timeToPlatinum: string }[]): string {
+  let fastest = Infinity;
+  let fastestStr = '--';
+  for (const t of trophies) {
+    if (t.timeToPlatinum === '--') continue;
+    const hours = t.timeToPlatinum.match(/(\d+)h/);
+    const minutes = t.timeToPlatinum.match(/(\d+)m/);
+    const total = (hours ? parseInt(hours[1]) * 60 : 0) + (minutes ? parseInt(minutes[1]) : 0);
+    if (total < fastest) {
+      fastest = total;
+      fastestStr = t.timeToPlatinum;
+    }
+  }
+  return fastestStr;
+}
+
+function getTopPlatform(trophies: { platform: string }[]): string {
+  if (trophies.length === 0) return '--';
+  const platforms: Record<string, number> = {};
+  for (const t of trophies) {
+    platforms[t.platform] = (platforms[t.platform] || 0) + 1;
+  }
+  return Object.entries(platforms).sort((a, b) => b[1] - a[1])[0][0];
+}
+
 export function YearInReviewCard({ onClose }: YearInReviewCardProps) {
   const { trophies, profile } = usePsnData();
   const currentYear = new Date().getFullYear().toString();
   const yearTrophies = trophies.filter(t => t.dateEarned.includes(currentYear));
+
+  const mostActiveMonth = getMostActiveMonth(yearTrophies);
+  const fastestPlatinum = getFastestPlatinum(yearTrophies);
+  const rarestTrophy = yearTrophies.length > 0
+    ? Math.min(...yearTrophies.map(t => t.rarity))
+    : 0;
+  const topPlatform = getTopPlatform(yearTrophies);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
@@ -93,7 +135,7 @@ export function YearInReviewCard({ onClose }: YearInReviewCardProps) {
               <div className="bg-[#12172A]/80 backdrop-blur-sm border border-[#1E2740] rounded-xl p-5">
                 <Calendar className="w-7 h-7 text-[#FFD700] mb-2" />
                 <div className="text-2xl font-bold text-white mb-0.5" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                  March
+                  {mostActiveMonth}
                 </div>
                 <div className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
                   Most Active Month
@@ -103,7 +145,7 @@ export function YearInReviewCard({ onClose }: YearInReviewCardProps) {
               <div className="bg-[#12172A]/80 backdrop-blur-sm border border-[#1E2740] rounded-xl p-5">
                 <Zap className="w-7 h-7 text-[#FFD700] mb-2" />
                 <div className="text-2xl font-bold text-white mb-0.5" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                  12h 20m
+                  {fastestPlatinum}
                 </div>
                 <div className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
                   Fastest Platinum
@@ -113,7 +155,7 @@ export function YearInReviewCard({ onClose }: YearInReviewCardProps) {
               <div className="bg-[#12172A]/80 backdrop-blur-sm border border-[#1E2740] rounded-xl p-5">
                 <Star className="w-7 h-7 text-[#FFD700] mb-2" />
                 <div className="text-2xl font-bold text-white mb-0.5" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                  0.1%
+                  {rarestTrophy}%
                 </div>
                 <div className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
                   Rarest Trophy
@@ -123,10 +165,10 @@ export function YearInReviewCard({ onClose }: YearInReviewCardProps) {
               <div className="bg-[#12172A]/80 backdrop-blur-sm border border-[#1E2740] rounded-xl p-5">
                 <Gamepad2 className="w-7 h-7 text-[#FFD700] mb-2" />
                 <div className="text-2xl font-bold text-white mb-0.5" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                  Action
+                  {topPlatform}
                 </div>
                 <div className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  Top Genre
+                  Top Platform
                 </div>
               </div>
             </div>

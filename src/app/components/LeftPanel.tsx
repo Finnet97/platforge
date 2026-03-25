@@ -21,6 +21,31 @@ interface LeftPanelProps {
   setShowGlow: (show: boolean) => void;
   showProfile: boolean;
   setShowProfile: (show: boolean) => void;
+  overlays: {
+    showOrder: boolean;
+    showGameName: boolean;
+    showDate: boolean;
+    showRarity: boolean;
+    showPlatformIcon: boolean;
+    showMilestones: boolean;
+    showRarestBadge: boolean;
+  };
+  setOverlays: (overlays: LeftPanelProps['overlays']) => void;
+  sortBy: 'date' | 'alpha' | 'rarity' | 'platform' | 'speed';
+  setSortBy: (sort: LeftPanelProps['sortBy']) => void;
+  platformFilter: string;
+  setPlatformFilter: (filter: string) => void;
+  bgType: 'solid' | 'gradient' | 'pattern' | 'transparent';
+  setBgType: (type: LeftPanelProps['bgType']) => void;
+  bgColor: string;
+  setBgColor: (color: string) => void;
+  showGlassmorphism: boolean;
+  setShowGlassmorphism: (show: boolean) => void;
+  showRarityHeatmap: boolean;
+  setShowRarityHeatmap: (show: boolean) => void;
+  fileType: 'png' | 'jpeg';
+  setFileType: (type: 'png' | 'jpeg') => void;
+  onExport: (format: 'png' | 'jpeg') => void;
 }
 
 function ControlSection({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
@@ -55,7 +80,24 @@ export function LeftPanel({
   showGlow,
   setShowGlow,
   showProfile,
-  setShowProfile
+  setShowProfile,
+  overlays,
+  setOverlays,
+  sortBy,
+  setSortBy,
+  platformFilter,
+  setPlatformFilter,
+  bgType,
+  setBgType,
+  bgColor,
+  setBgColor,
+  showGlassmorphism,
+  setShowGlassmorphism,
+  showRarityHeatmap,
+  setShowRarityHeatmap,
+  fileType,
+  setFileType,
+  onExport
 }: LeftPanelProps) {
   return (
     <div className="w-80 bg-[#0D1221] border-r border-[#1E2740] flex flex-col">
@@ -197,7 +239,11 @@ export function LeftPanel({
               <div className="flex items-center justify-between">
                 <label className="text-sm text-white" style={{ fontFamily: 'Inter, sans-serif' }}>Glassmorphism</label>
                 <Switch.Root
-                  className="w-11 h-6 rounded-full relative bg-[#1E2740]"
+                  checked={showGlassmorphism}
+                  onCheckedChange={setShowGlassmorphism}
+                  className={`w-11 h-6 rounded-full relative transition-colors ${
+                    showGlassmorphism ? 'bg-[#FFD700]' : 'bg-[#1E2740]'
+                  }`}
                 >
                   <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
                 </Switch.Root>
@@ -206,7 +252,11 @@ export function LeftPanel({
               <div className="flex items-center justify-between">
                 <label className="text-sm text-white" style={{ fontFamily: 'Inter, sans-serif' }}>Rarity Heatmap</label>
                 <Switch.Root
-                  className="w-11 h-6 rounded-full relative bg-[#1E2740]"
+                  checked={showRarityHeatmap}
+                  onCheckedChange={setShowRarityHeatmap}
+                  className={`w-11 h-6 rounded-full relative transition-colors ${
+                    showRarityHeatmap ? 'bg-[#FFD700]' : 'bg-[#1E2740]'
+                  }`}
                 >
                   <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
                 </Switch.Root>
@@ -220,10 +270,15 @@ export function LeftPanel({
               <div>
                 <label className="text-sm text-white mb-3 block" style={{ fontFamily: 'Inter, sans-serif' }}>Type</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Solid', 'Gradient', 'Pattern', 'Transparent'].map(type => (
+                  {(['solid', 'gradient', 'pattern', 'transparent'] as const).map(type => (
                     <button
                       key={type}
-                      className="h-10 rounded-lg border border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50 transition-colors text-sm"
+                      onClick={() => setBgType(type)}
+                      className={`h-10 rounded-lg border transition-colors text-sm capitalize ${
+                        bgType === type
+                          ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
+                          : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
+                      }`}
                       style={{ fontFamily: 'Inter, sans-serif' }}
                     >
                       {type}
@@ -233,9 +288,20 @@ export function LeftPanel({
               </div>
               <div>
                 <label className="text-sm text-white mb-2 block" style={{ fontFamily: 'Inter, sans-serif' }}>Color</label>
-                <div className="h-10 rounded-lg bg-[#0A0E1A] border border-[#1E2740] flex items-center px-3">
-                  <div className="w-6 h-6 rounded bg-[#0A0E1A] border border-[#FFD700]"></div>
-                  <span className="ml-3 text-sm text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>#0A0E1A</span>
+                <div className="h-10 rounded-lg bg-[#12172A] border border-[#1E2740] flex items-center px-3 gap-3">
+                  <input
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="w-6 h-6 rounded border-none cursor-pointer bg-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="flex-1 bg-transparent text-sm text-[#8A9BB8] focus:text-white focus:outline-none uppercase"
+                    style={{ fontFamily: 'Rajdhani, sans-serif' }}
+                  />
                 </div>
               </div>
             </div>
@@ -244,20 +310,23 @@ export function LeftPanel({
           {/* OVERLAYS Section */}
           <ControlSection title="Overlays" defaultOpen={false}>
             <div className="space-y-3">
-              {[
-                'Show platinum order number',
-                'Show game name',
-                'Show platinum date',
-                'Show rarity %',
-                'Show platform icon',
-                'Milestone badges',
-                'Rarest platinum badge'
-              ].map(label => (
-                <div key={label} className="flex items-center justify-between">
+              {([
+                { label: 'Show platinum order number', key: 'showOrder' as const },
+                { label: 'Show game name', key: 'showGameName' as const },
+                { label: 'Show platinum date', key: 'showDate' as const },
+                { label: 'Show rarity %', key: 'showRarity' as const },
+                { label: 'Show platform icon', key: 'showPlatformIcon' as const },
+                { label: 'Milestone badges', key: 'showMilestones' as const },
+                { label: 'Rarest platinum badge', key: 'showRarestBadge' as const },
+              ]).map(({ label, key }) => (
+                <div key={key} className="flex items-center justify-between">
                   <label className="text-sm text-white" style={{ fontFamily: 'Inter, sans-serif' }}>{label}</label>
                   <Switch.Root
-                    defaultChecked={label.includes('order') || label.includes('platform')}
-                    className="w-11 h-6 rounded-full relative bg-[#1E2740] data-[state=checked]:bg-[#FFD700]"
+                    checked={overlays[key]}
+                    onCheckedChange={(checked) => setOverlays({ ...overlays, [key]: checked })}
+                    className={`w-11 h-6 rounded-full relative transition-colors ${
+                      overlays[key] ? 'bg-[#FFD700]' : 'bg-[#1E2740]'
+                    }`}
                   >
                     <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
                   </Switch.Root>
@@ -289,12 +358,17 @@ export function LeftPanel({
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-white mb-2 block" style={{ fontFamily: 'Inter, sans-serif' }}>Sort By</label>
-                <select className="w-full h-10 bg-[#12172A] border border-[#1E2740] rounded-lg px-3 text-white text-sm focus:outline-none focus:border-[#FFD700]" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  <option>Date Earned</option>
-                  <option>Alphabetical</option>
-                  <option>Rarity</option>
-                  <option>Platform</option>
-                  <option>Speed</option>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as LeftPanelProps['sortBy'])}
+                  className="w-full h-10 bg-[#12172A] border border-[#1E2740] rounded-lg px-3 text-white text-sm focus:outline-none focus:border-[#FFD700]"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  <option value="date">Date Earned</option>
+                  <option value="alpha">Alphabetical</option>
+                  <option value="rarity">Rarity</option>
+                  <option value="platform">Platform</option>
+                  <option value="speed">Speed</option>
                 </select>
               </div>
               <div>
@@ -303,8 +377,9 @@ export function LeftPanel({
                   {['ALL', 'PS3', 'PS4', 'PS5', 'Vita'].map(platform => (
                     <button
                       key={platform}
+                      onClick={() => setPlatformFilter(platform)}
                       className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
-                        platform === 'ALL'
+                        platformFilter === platform
                           ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
                           : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
                       }`}
@@ -322,24 +397,41 @@ export function LeftPanel({
           <ControlSection title="Export Format Presets" defaultOpen={false}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
-                {['Custom', 'Twitter Card', 'Instagram Post', 'Instagram Story', 'Discord Banner', '4K Wallpaper'].map(preset => (
+                {([
+                  { label: 'Custom', rows: gridSize.rows, cols: gridSize.cols },
+                  { label: 'Twitter Card', rows: 3, cols: 5 },
+                  { label: 'Instagram Post', rows: 4, cols: 4 },
+                  { label: 'Instagram Story', rows: 6, cols: 3 },
+                  { label: 'Discord Banner', rows: 2, cols: 5 },
+                  { label: '4K Wallpaper', rows: 4, cols: 6 },
+                ] as const).map(preset => (
                   <button
-                    key={preset}
-                    className="h-10 rounded-lg border border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50 transition-colors text-xs"
+                    key={preset.label}
+                    onClick={() => {
+                      if (preset.label !== 'Custom') {
+                        setGridSize({ rows: preset.rows, cols: preset.cols });
+                      }
+                    }}
+                    className={`h-10 rounded-lg border transition-colors text-xs ${
+                      gridSize.rows === preset.rows && gridSize.cols === preset.cols
+                        ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
+                        : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
+                    }`}
                     style={{ fontFamily: 'Inter, sans-serif' }}
                   >
-                    {preset}
+                    {preset.label}
                   </button>
                 ))}
               </div>
               <div>
                 <label className="text-sm text-white mb-2 block" style={{ fontFamily: 'Inter, sans-serif' }}>File Type</label>
                 <div className="flex gap-2">
-                  {['PNG', 'JPEG', 'GIF'].map(type => (
+                  {(['png', 'jpeg'] as const).map(type => (
                     <button
                       key={type}
-                      className={`flex-1 h-9 rounded-lg border transition-colors text-sm ${
-                        type === 'PNG'
+                      onClick={() => setFileType(type)}
+                      className={`flex-1 h-9 rounded-lg border transition-colors text-sm uppercase ${
+                        fileType === type
                           ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
                           : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
                       }`}
@@ -350,6 +442,13 @@ export function LeftPanel({
                   ))}
                 </div>
               </div>
+              <button
+                onClick={() => onExport(fileType)}
+                className="w-full h-10 bg-[#FFD700] text-[#0A0E1A] rounded-lg text-sm font-semibold hover:bg-[#FFE44D] transition-colors"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                Export Image
+              </button>
             </div>
           </ControlSection>
         </ScrollArea.Viewport>

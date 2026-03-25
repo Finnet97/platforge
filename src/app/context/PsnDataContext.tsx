@@ -183,6 +183,10 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       if (!abort.signal.aborted) {
         setError(err.message);
+        // If session expired, mark as unauthenticated
+        if (err.message?.includes("expired") || err.message?.includes("Not authenticated") || err.message?.includes("reconnect")) {
+          setIsAuthenticated(false);
+        }
         // Keep mock data on error
         setTrophies(mockTrophies);
         setProfile({ ...mockProfile, rarestPlatinum: mockProfile.rarestPlatinum });

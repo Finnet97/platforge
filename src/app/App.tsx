@@ -1,16 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { TopBar } from './components/TopBar';
 import { LeftPanel } from './components/LeftPanel';
 import { CenterCanvas } from './components/CenterCanvas';
 import { RightPanel } from './components/RightPanel';
-import { TemplatesModal } from './components/TemplatesModal';
+import { TemplatesModal, type TemplateSettings } from './components/TemplatesModal';
 import { YearInReviewCard } from './components/YearInReviewCard';
 import { CompareMode } from './components/CompareMode';
 import { AuthSettingsModal } from './components/AuthSettingsModal';
 import { PsnDataProvider, usePsnData } from './context/PsnDataContext';
+import { toPng, toJpeg } from 'html-to-image';
+
+function parseTimeToPlatinum(time: string): number {
+  if (time === '--') return Infinity;
+  const hours = time.match(/(\d+)h/);
+  const minutes = time.match(/(\d+)m/);
+  return (hours ? parseInt(hours[1]) * 60 : 0) + (minutes ? parseInt(minutes[1]) : 0);
+}
 
 function AppContent() {
-  const { checkAuth } = usePsnData();
+  const { checkAuth, trophies } = usePsnData();
   const [selectedTile, setSelectedTile] = useState<number | null>(0);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [showYearInReview, setShowYearInReview] = useState(false);
@@ -23,6 +31,84 @@ function AppContent() {
   const [showBorders, setShowBorders] = useState(true);
   const [showGlow, setShowGlow] = useState(true);
   const [showProfile, setShowProfile] = useState(true);
+  const [overlays, setOverlays] = useState({
+    showOrder: true,
+    showGameName: false,
+    showDate: false,
+    showRarity: false,
+    showPlatformIcon: true,
+    showMilestones: false,
+    showRarestBadge: false,
+  });
+  const [sortBy, setSortBy] = useState<'date' | 'alpha' | 'rarity' | 'platform' | 'speed'>('date');
+  const [platformFilter, setPlatformFilter] = useState('ALL');
+  const [bgType, setBgType] = useState<'solid' | 'gradient' | 'pattern' | 'transparent'>('solid');
+  const [bgColor, setBgColor] = useState('#0A0E1A');
+  const [showGlassmorphism, setShowGlassmorphism] = useState(false);
+  const [showRarityHeatmap, setShowRarityHeatmap] = useState(false);
+  const [fileType, setFileType] = useState<'png' | 'jpeg'>('png');
+  const mosaicRef = useRef<HTMLDivElement | null>(null);
+
+  const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
+    const el = mosaicRef.current;
+    if (!el) return;
+    const exportFormat = format || fileType;
+    const originalTransform = el.style.transform;
+    el.style.transform = 'scale(1)';
+    try {
+      const dataUrl = exportFormat === 'png'
+        ? await toPng(el, { pixelRatio: 2 })
+        : await toJpeg(el, { quality: 0.95 });
+      const link = document.createElement('a');
+      link.download = `platforge-${Date.now()}.${exportFormat}`;
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      el.style.transform = originalTransform;
+    }
+  }, [fileType]);
+
+  const handleApplyTemplate = useCallback((settings: TemplateSettings) => {
+    setGridSize(settings.gridSize);
+    setLayoutStyle(settings.layoutStyle);
+    setSpacing(settings.spacing);
+    setBorderRadius(settings.borderRadius);
+    setShowBorders(settings.showBorders);
+    setShowGlow(settings.showGlow);
+    setShowGlassmorphism(settings.showGlassmorphism);
+    setShowRarityHeatmap(settings.showRarityHeatmap);
+    setBgType(settings.bgType);
+    setBgColor(settings.bgColor);
+    setOverlays(settings.overlays);
+  }, []);
+
+  const processedTrophies = useMemo(() => {
+    let result = [...trophies];
+
+    if (platformFilter !== 'ALL') {
+      result = result.filter(t => t.platform === platformFilter);
+    }
+
+    switch (sortBy) {
+      case 'date':
+        result.sort((a, b) => new Date(b.dateEarned).getTime() - new Date(a.dateEarned).getTime());
+        break;
+      case 'alpha':
+        result.sort((a, b) => a.gameTitle.localeCompare(b.gameTitle));
+        break;
+      case 'rarity':
+        result.sort((a, b) => a.rarity - b.rarity);
+        break;
+      case 'platform':
+        result.sort((a, b) => a.platform.localeCompare(b.platform));
+        break;
+      case 'speed':
+        result.sort((a, b) => parseTimeToPlatinum(a.timeToPlatinum) - parseTimeToPlatinum(b.timeToPlatinum));
+        break;
+    }
+
+    return result;
+  }, [trophies, platformFilter, sortBy]);
 
   useEffect(() => {
     checkAuth();
@@ -35,6 +121,7 @@ function AppContent() {
         onShowYearInReview={() => setShowYearInReview(true)}
         onShowCompare={() => setShowCompareMode(true)}
         onShowAuth={() => setShowAuthModal(true)}
+        onExport={handleExport}
       />
       
       <div className="flex-1 flex overflow-hidden">
@@ -53,6 +140,23 @@ function AppContent() {
           setShowGlow={setShowGlow}
           showProfile={showProfile}
           setShowProfile={setShowProfile}
+          overlays={overlays}
+          setOverlays={setOverlays}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          platformFilter={platformFilter}
+          setPlatformFilter={setPlatformFilter}
+          bgType={bgType}
+          setBgType={setBgType}
+          bgColor={bgColor}
+          setBgColor={setBgColor}
+          showGlassmorphism={showGlassmorphism}
+          setShowGlassmorphism={setShowGlassmorphism}
+          showRarityHeatmap={showRarityHeatmap}
+          setShowRarityHeatmap={setShowRarityHeatmap}
+          fileType={fileType}
+          setFileType={setFileType}
+          onExport={handleExport}
         />
         
         <CenterCanvas 
@@ -63,17 +167,25 @@ function AppContent() {
           showBorders={showBorders}
           showGlow={showGlow}
           showProfile={showProfile}
+          overlays={overlays}
+          processedTrophies={processedTrophies}
+          bgType={bgType}
+          bgColor={bgColor}
+          showGlassmorphism={showGlassmorphism}
+          showRarityHeatmap={showRarityHeatmap}
           selectedTile={selectedTile}
           onSelectTile={setSelectedTile}
+          onMosaicRef={(el) => { mosaicRef.current = el; }}
         />
-        
-        <RightPanel 
+
+        <RightPanel
           selectedTile={selectedTile}
+          processedTrophies={processedTrophies}
         />
       </div>
 
       {showTemplatesModal && (
-        <TemplatesModal onClose={() => setShowTemplatesModal(false)} />
+        <TemplatesModal onClose={() => setShowTemplatesModal(false)} onApply={handleApplyTemplate} />
       )}
 
       {showYearInReview && (
