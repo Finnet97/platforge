@@ -1,0 +1,179 @@
+import { useState, useEffect } from 'react';
+import { Search, Download, Share2, Save, Trophy, Settings, Loader2 } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import * as Progress from '@radix-ui/react-progress';
+import { usePsnData } from '../context/PsnDataContext';
+
+interface TopBarProps {
+  onShowTemplates: () => void;
+  onShowYearInReview: () => void;
+  onShowCompare: () => void;
+  onShowAuth: () => void;
+}
+
+export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onShowAuth }: TopBarProps) {
+  const { isAuthenticated, isLoading, loadingProgress, loadProfile, profile } = usePsnData();
+  const [psnInput, setPsnInput] = useState(profile.username);
+
+  useEffect(() => {
+    setPsnInput(profile.username);
+  }, [profile.username]);
+
+  const handleLoadProfile = () => {
+    const username = psnInput.trim();
+    if (username) {
+      loadProfile(username);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleLoadProfile();
+    }
+  };
+
+  const progressPercent = loadingProgress.total > 0
+    ? (loadingProgress.loaded / loadingProgress.total) * 100
+    : 0;
+
+  return (
+    <div className="bg-[#0D1221] border-b border-[#1E2740]">
+      <div className="h-16 px-6 flex items-center justify-between gap-4">
+        {/* Logo */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="relative">
+            <Trophy className="w-6 h-6 text-[#FFD700]" style={{ filter: 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.5))' }} />
+          </div>
+          <h1 className="text-xl font-bold text-[#FFD700]" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+            PlatForge
+          </h1>
+        </div>
+
+        {/* Center - PSN ID Input */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A9BB8]" />
+            <input
+              type="text"
+              placeholder="Enter PSN ID..."
+              value={psnInput}
+              onChange={(e) => setPsnInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-64 h-9 bg-[#12172A] border border-[#1E2740] rounded-lg pl-9 pr-3 text-sm text-white placeholder-[#8A9BB8] focus:outline-none focus:border-[#FFD700] transition-colors"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            />
+          </div>
+          <button
+            onClick={handleLoadProfile}
+            disabled={isLoading || !isAuthenticated}
+            className="h-9 px-5 bg-[#FFD700] text-[#0A0E1A] rounded-lg text-sm font-semibold hover:bg-[#FFE44D] transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Load Profile
+          </button>
+        </div>
+
+        {/* Right - Action Buttons */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Auth indicator + settings */}
+          <button
+            onClick={onShowAuth}
+            className={`h-9 px-3 border text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
+              isAuthenticated
+                ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:border-green-400'
+                : 'bg-[#12172A] border-[#1E2740] text-[#8A9BB8] hover:border-[#FFD700]'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            {isAuthenticated ? 'Connected' : 'Connect PSN'}
+          </button>
+
+          <button
+            onClick={onShowTemplates}
+            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Templates
+          </button>
+
+          <button
+            onClick={onShowYearInReview}
+            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors whitespace-nowrap"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Year Review
+          </button>
+
+          <button
+            onClick={onShowCompare}
+            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Compare
+          </button>
+
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors flex items-center gap-1.5" style={{ fontFamily: 'Inter, sans-serif' }}>
+                <Download className="w-3.5 h-3.5" />
+                Export
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                className="min-w-[180px] bg-[#12172A] border border-[#1E2740] rounded-lg p-1.5 shadow-xl z-50"
+                sideOffset={5}
+              >
+                <DropdownMenu.Item className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  Export as PNG
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  Export as GIF
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="px-3 py-2 text-sm text-white rounded hover:bg-[#1E2740] cursor-pointer outline-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  Export as 4K
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+
+          <button className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors flex items-center gap-1.5" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <Share2 className="w-3.5 h-3.5" />
+            Share
+          </button>
+
+          <button className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors flex items-center gap-1.5 whitespace-nowrap" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <Save className="w-3.5 h-3.5" />
+            Save
+          </button>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="px-6 pb-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
+            {isLoading ? 'Loading trophies...' : 'Trophy collection'}
+          </span>
+          <span className="text-xs text-[#FFD700] font-semibold" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+            {isLoading && loadingProgress.total > 0
+              ? `${loadingProgress.loaded}/${loadingProgress.total}`
+              : `${profile.totalPlatinums}`
+            }
+          </span>
+        </div>
+        <Progress.Root className="relative h-1 bg-[#1E2740] rounded-full overflow-hidden">
+          <Progress.Indicator
+            className="h-full bg-[#FFD700] transition-transform duration-300"
+            style={{
+              transform: `translateX(-${100 - (isLoading && loadingProgress.total > 0 ? progressPercent : 100)}%)`,
+              filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.8))'
+            }}
+          />
+        </Progress.Root>
+      </div>
+    </div>
+  );
+}
