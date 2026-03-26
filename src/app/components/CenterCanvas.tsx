@@ -30,6 +30,7 @@ interface CenterCanvasProps {
   bgColor: string;
   showGlassmorphism: boolean;
   showRarityHeatmap: boolean;
+  useTrophyImage: boolean;
   selectedTile: number | null;
   onSelectTile: (index: number) => void;
   onMosaicRef?: (el: HTMLDivElement | null) => void;
@@ -49,6 +50,7 @@ export function CenterCanvas({
   bgColor,
   showGlassmorphism,
   showRarityHeatmap,
+  useTrophyImage,
   selectedTile,
   onSelectTile,
   onMosaicRef
@@ -98,7 +100,7 @@ export function CenterCanvas({
           >
             {/* Trophy Image */}
             <img
-              src={trophy.imageUrl}
+              src={useTrophyImage && trophy.trophyImageUrl ? trophy.trophyImageUrl : trophy.imageUrl}
               alt={trophy.gameTitle}
               className="w-full h-full object-cover"
               style={{

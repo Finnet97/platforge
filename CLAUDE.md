@@ -101,7 +101,7 @@ Legacy endpoints (`/api/auth/login`, `/api/auth/verify-2fa`, `/api/auth/cancel-2
 
 **Data loading flow:**
 1. `GET /api/profile/:username` → searches user, fetches profile + all platinum titles (paginated, limit 800)
-2. Frontend progressively loads rarity data in batches of 3 with 200ms delays to avoid PSN rate limiting
+2. Frontend progressively loads rarity and platinum trophy icon URLs in batches of 3 with 200ms delays to avoid PSN rate limiting. Each batch calls both `getUserTrophiesEarnedForTitle` (rarity) and `getTitleTrophies` (trophy icon) in parallel via `Promise.all`.
 3. Uses `Promise.allSettled()` for graceful individual failures
 4. `AbortController` enables cancellation of in-progress loads
 
@@ -109,7 +109,7 @@ Legacy endpoints (`/api/auth/login`, `/api/auth/verify-2fa`, `/api/auth/cancel-2
 
 ## Key Data Types
 
-**`Trophy`** (frontend, defined in `src/app/data/mockData.ts`): id, gameTitle, platform (PS3/PS4/PS5/Vita/PSVR), dateEarned, rarity, timeToPlatinum, order, imageUrl.
+**`Trophy`** (frontend, defined in `src/app/data/mockData.ts`): id, gameTitle, platform (PS3/PS4/PS5/Vita/PSVR), dateEarned, rarity, timeToPlatinum, order, imageUrl, trophyImageUrl (optional — platinum trophy icon, loaded progressively).
 
 **`Profile`** (frontend, defined in `src/app/context/PsnDataContext.tsx`): username, psnLevel, totalPlatinums, avatar, rarestPlatinum (`Trophy | null`).
 

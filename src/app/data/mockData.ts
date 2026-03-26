@@ -7,6 +7,7 @@ export interface Trophy {
   timeToPlatinum: string;
   order: number;
   imageUrl: string;
+  trophyImageUrl?: string;
 }
 
 export const mockTrophies: Trophy[] = [

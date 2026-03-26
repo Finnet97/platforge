@@ -47,6 +47,8 @@ interface LeftPanelProps {
   setShowRarityHeatmap: (show: boolean) => void;
   fileType: 'png' | 'jpeg';
   setFileType: (type: 'png' | 'jpeg') => void;
+  useTrophyImage: boolean;
+  setUseTrophyImage: (use: boolean) => void;
   onExport: (format: 'png' | 'jpeg') => void;
 }
 
@@ -101,6 +103,8 @@ export function LeftPanel({
   setShowRarityHeatmap,
   fileType,
   setFileType,
+  useTrophyImage,
+  setUseTrophyImage,
   onExport
 }: LeftPanelProps) {
   return (
@@ -265,6 +269,19 @@ export function LeftPanel({
                   onCheckedChange={setShowRarityHeatmap}
                   className={`w-11 h-6 rounded-full relative transition-colors ${
                     showRarityHeatmap ? 'bg-[#FFD700]' : 'bg-[#1E2740]'
+                  }`}
+                >
+                  <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
+                </Switch.Root>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-white" style={{ fontFamily: 'Inter, sans-serif' }}>Platinum Trophy Icon</label>
+                <Switch.Root
+                  checked={useTrophyImage}
+                  onCheckedChange={setUseTrophyImage}
+                  className={`w-11 h-6 rounded-full relative transition-colors ${
+                    useTrophyImage ? 'bg-[#FFD700]' : 'bg-[#1E2740]'
                   }`}
                 >
                   <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />

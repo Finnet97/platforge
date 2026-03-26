@@ -54,6 +54,7 @@ interface ProfileResponse {
 interface RarityResponse {
   rarity: number;
   earnedDate: string | null;
+  trophyIconUrl: string | null;
 }
 
 export function PsnDataProvider({ children }: { children: ReactNode }) {
@@ -166,10 +167,11 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
         for (let j = 0; j < results.length; j++) {
           const trophyIndex = i + j;
           const result = results[j];
-          if (result.status === "fulfilled" && result.value.rarity > 0) {
+          if (result.status === "fulfilled") {
             enrichedTrophies[trophyIndex] = {
               ...enrichedTrophies[trophyIndex],
-              rarity: result.value.rarity,
+              ...(result.value.rarity > 0 && { rarity: result.value.rarity }),
+              ...(result.value.trophyIconUrl && { trophyImageUrl: result.value.trophyIconUrl }),
             };
           }
         }

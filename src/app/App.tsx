@@ -47,6 +47,7 @@ function AppContent() {
   const [showGlassmorphism, setShowGlassmorphism] = useState(false);
   const [showRarityHeatmap, setShowRarityHeatmap] = useState(false);
   const [fileType, setFileType] = useState<'png' | 'jpeg'>('png');
+  const [useTrophyImage, setUseTrophyImage] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const mosaicRef = useRef<HTMLDivElement | null>(null);
@@ -187,6 +188,8 @@ function AppContent() {
           setShowRarityHeatmap={setShowRarityHeatmap}
           fileType={fileType}
           setFileType={setFileType}
+          useTrophyImage={useTrophyImage}
+          setUseTrophyImage={setUseTrophyImage}
           onExport={handleExport}
         />
         
@@ -204,6 +207,7 @@ function AppContent() {
           bgColor={bgColor}
           showGlassmorphism={showGlassmorphism}
           showRarityHeatmap={showRarityHeatmap}
+          useTrophyImage={useTrophyImage}
           selectedTile={selectedTile}
           onSelectTile={setSelectedTile}
           onMosaicRef={(el) => { mosaicRef.current = el; }}

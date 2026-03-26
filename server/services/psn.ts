@@ -215,33 +215,38 @@ export async function fetchPlatinumTitles(accountId: string): Promise<TrophyTitl
   );
 }
 
-/** Fetch the platinum trophy's earned rate for a specific title. */
+/** Fetch the platinum trophy's earned rate and icon for a specific title. */
 export async function fetchPlatinumRarity(
   accountId: string,
   npCommunicationId: string,
   npServiceName: "trophy" | "trophy2"
-): Promise<{ rarity: number; earnedDate: string | null }> {
-  const { getUserTrophiesEarnedForTitle } = await getPsnApi();
+): Promise<{ rarity: number; earnedDate: string | null; trophyIconUrl: string | null }> {
+  const { getUserTrophiesEarnedForTitle, getTitleTrophies } = await getPsnApi();
   const auth = await getAuth();
-  const response = await getUserTrophiesEarnedForTitle(
-    auth,
-    accountId,
-    npCommunicationId,
-    "all",
-    { npServiceName }
-  );
 
-  // Find the platinum trophy (trophyType === "platinum")
-  const platinum = response.trophies.find(
+  // Fetch user's earned data and title trophy details in parallel
+  const [userResponse, titleResponse] = await Promise.all([
+    getUserTrophiesEarnedForTitle(auth, accountId, npCommunicationId, "all", { npServiceName }),
+    getTitleTrophies(auth, npCommunicationId, "all", { npServiceName }),
+  ]);
+
+  // Find the earned platinum trophy (for rarity)
+  const platinum = userResponse.trophies.find(
     (t: UserThinTrophy) => t.trophyType === "platinum" && t.earned
   );
 
+  // Find the platinum trophy definition (for icon URL)
+  const platinumDef = titleResponse.trophies.find(
+    (t: any) => t.trophyType === "platinum"
+  );
+
   if (!platinum) {
-    return { rarity: 0, earnedDate: null };
+    return { rarity: 0, earnedDate: null, trophyIconUrl: platinumDef?.trophyIconUrl ?? null };
   }
 
   return {
     rarity: platinum.trophyEarnedRate ? parseFloat(platinum.trophyEarnedRate) : 0,
     earnedDate: platinum.earnedDateTime ?? null,
+    trophyIconUrl: platinumDef?.trophyIconUrl ?? null,
   };
 }
