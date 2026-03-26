@@ -14,14 +14,68 @@ async function getPsnApi() {
   return psnApi;
 }
 
-let authTokens: AuthTokensResponse | null = null;
-let authExpiresAt: number = 0;
+// --- User auth state (optional, for private profiles) ---
+let userAuthTokens: AuthTokensResponse | null = null;
+let userAuthExpiresAt: number = 0;
 
-export function isAuthenticated(): boolean {
-  return authTokens !== null;
+// --- Service account auth state (for public mode) ---
+let serviceAuthTokens: AuthTokensResponse | null = null;
+let serviceAuthExpiresAt: number = 0;
+
+// ==================== Service Account Auth ====================
+
+export async function initServiceAuth(): Promise<void> {
+  const npsso = process.env.SERVICE_NPSSO;
+  if (!npsso) {
+    console.warn("[psn] SERVICE_NPSSO not set — public mode unavailable. Users must provide their own NPSSO token.");
+    return;
+  }
+
+  const { exchangeNpssoForAccessCode, exchangeAccessCodeForAuthTokens } = await getPsnApi();
+  try {
+    const accessCode = await exchangeNpssoForAccessCode(npsso);
+    serviceAuthTokens = await exchangeAccessCodeForAuthTokens(accessCode);
+    serviceAuthExpiresAt = Date.now() + serviceAuthTokens.expiresIn * 1000;
+    console.log("[psn] Service account authenticated successfully");
+  } catch (err: any) {
+    console.warn("[psn] Service account auth failed:", err.message);
+    console.warn("[psn] Public mode unavailable — users must provide their own NPSSO token.");
+  }
 }
 
-export async function authenticate(npsso: string): Promise<void> {
+export function isServiceAuthenticated(): boolean {
+  return serviceAuthTokens !== null;
+}
+
+async function getServiceAuth(): Promise<AuthorizationPayload> {
+  if (!serviceAuthTokens) {
+    throw new Error("Service account not configured. Public mode unavailable.");
+  }
+
+  if (Date.now() >= serviceAuthExpiresAt - 30000) {
+    try {
+      const { exchangeRefreshTokenForAuthTokens } = await getPsnApi();
+      serviceAuthTokens = await exchangeRefreshTokenForAuthTokens(serviceAuthTokens.refreshToken);
+      serviceAuthExpiresAt = Date.now() + serviceAuthTokens.expiresIn * 1000;
+      console.log("[psn] Service account token refreshed");
+    } catch {
+      serviceAuthTokens = null;
+      serviceAuthExpiresAt = 0;
+      console.error("[psn] Service account token refresh failed — public mode unavailable");
+      throw new Error("Service account session expired. Public mode unavailable.");
+    }
+  }
+
+  return { accessToken: serviceAuthTokens.accessToken };
+}
+
+// ==================== User Auth ====================
+
+export function isUserAuthenticated(): boolean {
+  return userAuthTokens !== null;
+}
+
+export async function authenticateUser(npsso: string): Promise<void> {
   const { exchangeNpssoForAccessCode, exchangeAccessCodeForAuthTokens } = await getPsnApi();
   let accessCode: string;
   try {
@@ -38,48 +92,53 @@ export async function authenticate(npsso: string): Promise<void> {
     throw new Error(`Authentication failed: ${msg}`);
   }
   try {
-    authTokens = await exchangeAccessCodeForAuthTokens(accessCode);
-    authExpiresAt = Date.now() + authTokens.expiresIn * 1000;
+    userAuthTokens = await exchangeAccessCodeForAuthTokens(accessCode);
+    userAuthExpiresAt = Date.now() + userAuthTokens.expiresIn * 1000;
   } catch (err: any) {
     console.error("[psn] exchangeAccessCodeForAuthTokens failed:", err.message);
     throw new Error("Failed to exchange access code for tokens. The NPSSO token may have expired.");
   }
 }
 
-export async function getAuth(): Promise<AuthorizationPayload> {
-  if (!authTokens) {
+async function getUserAuth(): Promise<AuthorizationPayload> {
+  if (!userAuthTokens) {
     throw new Error("Not authenticated. Submit an NPSSO token first.");
   }
 
-  // Refresh if expired or about to expire (30s buffer)
-  if (Date.now() >= authExpiresAt - 30000) {
+  if (Date.now() >= userAuthExpiresAt - 30000) {
     try {
       const { exchangeRefreshTokenForAuthTokens } = await getPsnApi();
-      authTokens = await exchangeRefreshTokenForAuthTokens(authTokens.refreshToken);
-      authExpiresAt = Date.now() + authTokens.expiresIn * 1000;
+      userAuthTokens = await exchangeRefreshTokenForAuthTokens(userAuthTokens.refreshToken);
+      userAuthExpiresAt = Date.now() + userAuthTokens.expiresIn * 1000;
     } catch {
-      authTokens = null;
-      authExpiresAt = 0;
+      userAuthTokens = null;
+      userAuthExpiresAt = 0;
       throw new Error("Session expired. Please submit a new NPSSO token.");
     }
   }
 
-  return { accessToken: authTokens.accessToken };
+  return { accessToken: userAuthTokens.accessToken };
 }
 
-export function clearAuth(): void {
-  authTokens = null;
-  authExpiresAt = 0;
+export function clearUserAuth(): void {
+  userAuthTokens = null;
+  userAuthExpiresAt = 0;
 }
+
+// ==================== Unified Auth Resolver ====================
+
+/** Returns the best available auth: user auth (preferred) > service auth. */
+async function getAuth(): Promise<AuthorizationPayload> {
+  if (isUserAuthenticated()) return getUserAuth();
+  if (isServiceAuthenticated()) return getServiceAuth();
+  throw new Error("No authentication available. Please connect your PSN account or configure a service account.");
+}
+
+// ==================== PSN Data Functions ====================
 
 export async function searchUser(username: string): Promise<string> {
   const { getProfileFromUserName, makeUniversalSearch } = await getPsnApi();
-  let auth;
-  try {
-    auth = await getAuth();
-  } catch (err: any) {
-    throw new Error(err.message || "Authentication failed");
-  }
+  const auth = await getAuth();
 
   // 1. Try exact lookup via legacy API (handles underscores and special chars)
   try {

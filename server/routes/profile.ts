@@ -31,16 +31,30 @@ router.get("/:username", async (req, res) => {
 
     let status = 500;
     let userMessage = msg;
-    if (msg.includes("not found")) status = 404;
-    if (msg === "fetch failed" || msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT")) {
+    let errorCode: string | undefined;
+
+    if (msg.includes("not found")) {
+      status = 404;
+    } else if (msg === "fetch failed" || msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT")) {
       userMessage = "PSN API is unreachable. Please check your connection or try again later.";
-    }
-    if (msg.includes("expired") || msg.includes("Not authenticated")) {
+    } else if (msg.includes("No authentication available") || msg.includes("Service account not configured")) {
+      status = 503;
+      errorCode = "service_unavailable";
+      userMessage = "Service temporarily unavailable. Please try again later or connect your PSN account.";
+    } else if (msg.includes("Service account session expired")) {
+      status = 503;
+      errorCode = "service_unavailable";
+      userMessage = "Service temporarily unavailable. Please try again later.";
+    } else if (msg.includes("expired") || msg.includes("Not authenticated")) {
       status = 401;
       userMessage = "Session expired. Please reconnect your PSN account.";
+    } else if (msg.includes("403") || msg.includes("Forbidden") || msg.includes("private") || msg.includes("not allowed")) {
+      status = 403;
+      errorCode = "private_profile";
+      userMessage = "This profile is private. Connect your PSN account to view it.";
     }
 
-    res.status(status).json({ error: userMessage });
+    res.status(status).json({ error: userMessage, ...(errorCode && { code: errorCode }) });
   }
 });
 

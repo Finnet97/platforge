@@ -15,6 +15,8 @@ interface PsnDataState {
   trophies: Trophy[];
   profile: Profile;
   isAuthenticated: boolean;
+  serviceAvailable: boolean;
+  canSearch: boolean;
   isLoading: boolean;
   loadingProgress: { loaded: number; total: number };
   error: string | null;
@@ -61,17 +63,25 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
     rarestPlatinum: mockProfile.rarestPlatinum,
   });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [serviceAvailable, setServiceAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const canSearch = isAuthenticated || serviceAvailable;
+
   const checkAuth = useCallback(async () => {
     try {
-      const data = await fetchJson<{ authenticated: boolean }>("/auth/status");
-      setIsAuthenticated(data.authenticated);
+      const [authData, serviceData] = await Promise.all([
+        fetchJson<{ authenticated: boolean }>("/auth/status"),
+        fetchJson<{ available: boolean }>("/auth/service-status"),
+      ]);
+      setIsAuthenticated(authData.authenticated);
+      setServiceAvailable(serviceData.available);
     } catch {
       setIsAuthenticated(false);
+      setServiceAvailable(false);
     }
   }, []);
 
@@ -182,14 +192,20 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
       }
     } catch (err: any) {
       if (!abort.signal.aborted) {
-        setError(err.message);
-        // If session expired, mark as unauthenticated
-        if (err.message?.includes("expired") || err.message?.includes("Not authenticated") || err.message?.includes("reconnect")) {
+        const msg = err.message || "Failed to fetch profile.";
+        setError(msg);
+
+        // If user session expired, mark as unauthenticated
+        if (msg.includes("expired") || msg.includes("Not authenticated") || msg.includes("reconnect")) {
           setIsAuthenticated(false);
         }
-        // Keep mock data on error
-        setTrophies(mockTrophies);
-        setProfile({ ...mockProfile, rarestPlatinum: mockProfile.rarestPlatinum });
+
+        // Only fall back to mock data if it's an auth/session error
+        // For service errors (503) or private profiles (403), keep current state
+        if (msg.includes("expired") || msg.includes("Not authenticated") || msg.includes("reconnect")) {
+          setTrophies(mockTrophies);
+          setProfile({ ...mockProfile, rarestPlatinum: mockProfile.rarestPlatinum });
+        }
       }
     } finally {
       if (!abort.signal.aborted) {
@@ -204,6 +220,8 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
         trophies,
         profile,
         isAuthenticated,
+        serviceAvailable,
+        canSearch,
         isLoading,
         loadingProgress,
         error,

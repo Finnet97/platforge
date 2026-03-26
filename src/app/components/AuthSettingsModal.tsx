@@ -117,7 +117,7 @@ export function AuthSettingsModal({ onClose }: AuthSettingsModalProps) {
                     Connect via NPSSO Token
                   </p>
                   <p className="text-xs text-[#8A9BB8] mt-1 leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    To connect your PSN account, you need to get a security token from Sony. This is a one-time process that takes about 30 seconds.
+                    PlatForge works without login for public profiles. Connect your own PSN account only if you need to access private profiles. This is a one-time process that takes about 30 seconds.
                   </p>
                 </div>
               </div>
@@ -263,7 +263,7 @@ export function AuthSettingsModal({ onClose }: AuthSettingsModalProps) {
 
           {/* Security note */}
           <p className="text-[10px] text-[#8A9BB8] text-center" style={{ fontFamily: 'Inter, sans-serif' }}>
-            Your token is used only to authenticate and is never stored permanently.
+            Your token is used only to authenticate and is never stored permanently. Connecting is optional — public profiles can be viewed without it.
           </p>
         </div>
       </div>

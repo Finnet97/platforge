@@ -13,7 +13,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onShowAuth, onExport }: TopBarProps) {
-  const { isAuthenticated, isLoading, loadingProgress, loadProfile, profile, error } = usePsnData();
+  const { isAuthenticated, canSearch, isLoading, loadingProgress, loadProfile, profile, error } = usePsnData();
   const [psnInput, setPsnInput] = useState(profile.username);
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
           </div>
           <button
             onClick={handleLoadProfile}
-            disabled={isLoading || !isAuthenticated}
+            disabled={isLoading || !canSearch}
             className="h-9 px-5 bg-[#FFD700] text-[#0A0E1A] rounded-lg text-sm font-semibold hover:bg-[#FFE44D] transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             style={{ fontFamily: 'Inter, sans-serif' }}
           >
@@ -86,7 +86,7 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
 
         {/* Right - Action Buttons */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Auth indicator + settings */}
+          {/* Auth settings */}
           <button
             onClick={onShowAuth}
             className={`h-9 px-3 border text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
@@ -95,9 +95,10 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
                 : 'bg-[#12172A] border-[#1E2740] text-[#8A9BB8] hover:border-[#FFD700]'
             }`}
             style={{ fontFamily: 'Inter, sans-serif' }}
+            title={isAuthenticated ? 'Connected to PSN' : 'PSN account settings'}
           >
             <Settings className="w-3.5 h-3.5" />
-            {isAuthenticated ? 'Connected' : 'Connect PSN'}
+            {isAuthenticated ? 'Connected' : 'PSN'}
           </button>
 
           <button

@@ -3,6 +3,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import profileRoutes from "./routes/profile.js";
 import trophyRoutes from "./routes/trophies.js";
+import { initServiceAuth } from "./services/psn.js";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
@@ -18,6 +19,11 @@ app.use("/api/trophies", trophyRoutes);
 // Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// Initialize service account auth (non-blocking)
+initServiceAuth().catch((err) => {
+  console.warn("[server] Service account init failed:", err.message);
 });
 
 app.listen(PORT, () => {

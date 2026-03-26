@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate, isAuthenticated, clearAuth } from "../services/psn.js";
+import { authenticateUser, isUserAuthenticated, clearUserAuth, isServiceAuthenticated } from "../services/psn.js";
 import {
   loginWithCredentials,
   submitTwoFactorCode,
@@ -21,7 +21,7 @@ router.post("/login", async (req, res) => {
     const result = await loginWithCredentials(email.trim(), password);
 
     if (result.npsso) {
-      await authenticate(result.npsso);
+      await authenticateUser(result.npsso);
       res.json({ success: true });
     } else {
       res.json({ requiresTwoFactor: true, sessionId: result.sessionId });
@@ -42,7 +42,7 @@ router.post("/verify-2fa", async (req, res) => {
 
   try {
     const npsso = await submitTwoFactorCode(sessionId, code.trim());
-    await authenticate(npsso);
+    await authenticateUser(npsso);
     res.json({ success: true });
   } catch (err: any) {
     res.status(401).json({ error: err.message || "Verification failed." });
@@ -58,7 +58,7 @@ router.post("/cancel-2fa", (req, res) => {
   res.json({ success: true });
 });
 
-// Fallback: manual NPSSO token
+// Manual NPSSO token
 router.post("/npsso", async (req, res) => {
   const { npsso } = req.body;
 
@@ -68,7 +68,7 @@ router.post("/npsso", async (req, res) => {
   }
 
   try {
-    await authenticate(npsso.trim());
+    await authenticateUser(npsso.trim());
     res.json({ success: true });
   } catch (err: any) {
     res.status(401).json({ error: err.message || "Authentication failed." });
@@ -76,11 +76,16 @@ router.post("/npsso", async (req, res) => {
 });
 
 router.get("/status", (_req, res) => {
-  res.json({ authenticated: isAuthenticated() });
+  res.json({ authenticated: isUserAuthenticated() });
+});
+
+// Service account status — tells frontend if public mode is available
+router.get("/service-status", (_req, res) => {
+  res.json({ available: isServiceAuthenticated() });
 });
 
 router.post("/logout", (_req, res) => {
-  clearAuth();
+  clearUserAuth();
   res.json({ success: true });
 });
 
