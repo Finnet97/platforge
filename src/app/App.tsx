@@ -47,6 +47,8 @@ function AppContent() {
   const [showGlassmorphism, setShowGlassmorphism] = useState(false);
   const [showRarityHeatmap, setShowRarityHeatmap] = useState(false);
   const [fileType, setFileType] = useState<'png' | 'jpeg'>('png');
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const mosaicRef = useRef<HTMLDivElement | null>(null);
 
   const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
@@ -55,6 +57,31 @@ function AppContent() {
     const exportFormat = format || fileType;
     const originalTransform = el.style.transform;
     el.style.transform = 'scale(1)';
+
+    // Convert cross-origin images to data URLs via proxy
+    const imgs = el.querySelectorAll('img');
+    const originals: { img: HTMLImageElement; src: string }[] = [];
+    await Promise.all(
+      Array.from(imgs).map(async (img) => {
+        try {
+          const src = img.src;
+          if (!src || src.startsWith('data:')) return;
+          originals.push({ img, src });
+          const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(src)}`;
+          const resp = await fetch(proxyUrl);
+          const blob = await resp.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          img.src = dataUrl;
+        } catch {
+          // Keep original src if proxy fails
+        }
+      })
+    );
+
     try {
       const dataUrl = exportFormat === 'png'
         ? await toPng(el, { pixelRatio: 2 })
@@ -65,6 +92,8 @@ function AppContent() {
       link.click();
     } finally {
       el.style.transform = originalTransform;
+      // Restore original image sources
+      originals.forEach(({ img, src }) => { img.src = src; });
     }
   }, [fileType]);
 
@@ -125,7 +154,9 @@ function AppContent() {
       />
       
       <div className="flex-1 flex overflow-hidden">
-        <LeftPanel 
+        <LeftPanel
+          isOpen={leftPanelOpen}
+          onToggle={() => setLeftPanelOpen(!leftPanelOpen)}
           gridSize={gridSize}
           setGridSize={setGridSize}
           layoutStyle={layoutStyle}
@@ -179,6 +210,8 @@ function AppContent() {
         />
 
         <RightPanel
+          isOpen={rightPanelOpen}
+          onToggle={() => setRightPanelOpen(!rightPanelOpen)}
           selectedTile={selectedTile}
           processedTrophies={processedTrophies}
         />

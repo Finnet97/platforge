@@ -24,11 +24,13 @@ No test framework is configured.
 **Entry flow:** `index.html` → `src/main.tsx` → `src/app/App.tsx`
 
 **App.tsx** is the root component managing UI state via `useState` and props drilling. It renders a 7-panel layout:
-- **TopBar** — Header with PSN ID search input, logo, action buttons
-- **LeftPanel** — Settings controls (grid size, layout, spacing, visual effects)
+- **TopBar** — Header with PSN ID search input, logo, action buttons. Progress bar only renders during active loading.
+- **LeftPanel** — Settings controls (grid size, layout, spacing, visual effects). Collapsible via chevron toggle button on right edge.
 - **CenterCanvas** — Main trophy grid display with zoom and profile header
-- **RightPanel** — Selected trophy detail view and tile list
+- **RightPanel** — Selected trophy detail view and tile list. Collapsible via chevron toggle button on left edge.
 - **TemplatesModal, YearInReviewCard, CompareMode** — Modal overlays
+
+Both side panels support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with CSS transitions. CenterCanvas auto-expands via `flex-1`.
 
 **`src/app/components/ui/`** contains ~54 shadcn/ui components (Radix UI primitives + Tailwind). The `cn()` utility in `ui/utils.ts` merges classnames via clsx + tailwind-merge.
 
@@ -67,6 +69,7 @@ No test framework is configured.
 | POST | `/api/auth/logout` | Clear user auth tokens |
 | GET | `/api/profile/:username` | Search user, fetch profile + platinum titles |
 | GET | `/api/trophies/:accountId/:npCommunicationId/rarity` | Fetch platinum rarity for a specific title |
+| GET | `/api/image-proxy?url=...` | Proxy external images to bypass CORS for export |
 
 Legacy endpoints (`/api/auth/login`, `/api/auth/verify-2fa`, `/api/auth/cancel-2fa`) exist but throw errors — Sony's Akamai anti-bot blocks automated browser login.
 
@@ -154,3 +157,4 @@ See `.env.example` for setup instructions.
 - `timeToPlatinum` field is always `"--"` (placeholder) — PSN API doesn't provide this data
 - Mock data is used as initial/fallback state; it's displayed when no profile is loaded
 - `SERVICE_NPSSO` refresh token chain can break after extended downtime — requires manual renewal
+- Export (`html-to-image`) requires the image proxy (`/api/image-proxy`) to convert cross-origin images to data URLs before canvas capture

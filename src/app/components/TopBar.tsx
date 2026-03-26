@@ -167,29 +167,28 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="px-6 pb-3">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
-            {isLoading ? 'Loading trophies...' : 'Trophy collection'}
-          </span>
-          <span className="text-xs text-[#FFD700] font-semibold" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-            {isLoading && loadingProgress.total > 0
-              ? `${loadingProgress.loaded}/${loadingProgress.total}`
-              : `${profile.totalPlatinums}`
-            }
-          </span>
+      {/* Progress Bar — only visible while loading */}
+      {isLoading && loadingProgress.total > 0 && (
+        <div className="px-6 pb-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Loading trophies...
+            </span>
+            <span className="text-xs text-[#FFD700] font-semibold" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+              {loadingProgress.loaded}/{loadingProgress.total}
+            </span>
+          </div>
+          <Progress.Root className="relative h-1 bg-[#1E2740] rounded-full overflow-hidden">
+            <Progress.Indicator
+              className="h-full bg-[#FFD700] transition-transform duration-300"
+              style={{
+                transform: `translateX(-${100 - progressPercent}%)`,
+                filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.8))'
+              }}
+            />
+          </Progress.Root>
         </div>
-        <Progress.Root className="relative h-1 bg-[#1E2740] rounded-full overflow-hidden">
-          <Progress.Indicator
-            className="h-full bg-[#FFD700] transition-transform duration-300"
-            style={{
-              transform: `translateX(-${100 - (isLoading && loadingProgress.total > 0 ? progressPercent : 100)}%)`,
-              filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.8))'
-            }}
-          />
-        </Progress.Root>
-      </div>
+      )}
     </div>
   );
 }

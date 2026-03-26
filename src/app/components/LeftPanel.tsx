@@ -4,9 +4,11 @@ import * as Slider from '@radix-ui/react-slider';
 import * as Switch from '@radix-ui/react-switch';
 import * as Select from '@radix-ui/react-select';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
-import { ChevronDown, Grid3x3, Hexagon, LayoutGrid, Sparkles, Clock } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Grid3x3, Hexagon, LayoutGrid, Sparkles, Clock } from 'lucide-react';
 
 interface LeftPanelProps {
+  isOpen: boolean;
+  onToggle: () => void;
   gridSize: { rows: number; cols: number };
   setGridSize: (size: { rows: number; cols: number }) => void;
   layoutStyle: string;
@@ -67,6 +69,8 @@ function ControlSection({ title, children, defaultOpen = true }: { title: string
 }
 
 export function LeftPanel({
+  isOpen,
+  onToggle,
   gridSize,
   setGridSize,
   layoutStyle,
@@ -100,9 +104,14 @@ export function LeftPanel({
   onExport
 }: LeftPanelProps) {
   return (
-    <div className="w-80 bg-[#0D1221] border-r border-[#1E2740] flex flex-col">
-      <ScrollArea.Root className="flex-1">
-        <ScrollArea.Viewport className="w-full h-full">
+    <div className="relative flex-shrink-0 flex" style={{ zIndex: 10 }}>
+      <div
+        className={`bg-[#0D1221] border-r border-[#1E2740] flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+          isOpen ? 'w-80' : 'w-0 border-r-0'
+        }`}
+      >
+        <ScrollArea.Root className="flex-1">
+          <ScrollArea.Viewport className="w-full h-full" style={{ minWidth: '320px' }}>
           {/* LAYOUT Section */}
           <ControlSection title="Layout">
             <div className="space-y-4">
@@ -459,6 +468,19 @@ export function LeftPanel({
           <ScrollArea.Thumb className="flex-1 bg-[#FFD700]/40 rounded-full relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]" />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
+      </div>
+      <button
+        onClick={onToggle}
+        className="absolute top-1/2 -translate-y-1/2 -right-4 w-4 h-12 bg-[#0D1221] border border-[#1E2740] border-l-0 rounded-r-md flex items-center justify-center hover:bg-[#12172A] transition-colors cursor-pointer"
+        style={{ zIndex: 11 }}
+        title={isOpen ? 'Collapse left panel' : 'Expand left panel'}
+      >
+        {isOpen ? (
+          <ChevronLeft className="w-3.5 h-3.5 text-[#8A9BB8]" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5 text-[#8A9BB8]" />
+        )}
+      </button>
     </div>
   );
 }

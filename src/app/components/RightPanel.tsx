@@ -1,14 +1,16 @@
 import * as ScrollArea from '@radix-ui/react-scroll-area';
-import { GripVertical, Gamepad2, Clock, TrendingUp, Calendar } from 'lucide-react';
+import { GripVertical, Gamepad2, Clock, TrendingUp, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePsnData } from '../context/PsnDataContext';
 import type { Trophy } from '../data/mockData';
 
 interface RightPanelProps {
+  isOpen: boolean;
+  onToggle: () => void;
   selectedTile: number | null;
   processedTrophies: Trophy[];
 }
 
-export function RightPanel({ selectedTile, processedTrophies }: RightPanelProps) {
+export function RightPanel({ isOpen, onToggle, selectedTile, processedTrophies }: RightPanelProps) {
   const { profile } = usePsnData();
   const selectedTrophy = selectedTile !== null ? processedTrophies[selectedTile] : processedTrophies[0];
   if (!selectedTrophy) return null;
@@ -30,9 +32,26 @@ export function RightPanel({ selectedTile, processedTrophies }: RightPanelProps)
   };
 
   return (
-    <div className="w-80 bg-[#0D1221] border-l border-[#1E2740] flex flex-col">
-      <ScrollArea.Root className="flex-1">
-        <ScrollArea.Viewport className="w-full h-full">
+    <div className="relative flex-shrink-0 flex" style={{ zIndex: 10 }}>
+      <button
+        onClick={onToggle}
+        className="absolute top-1/2 -translate-y-1/2 -left-4 w-4 h-12 bg-[#0D1221] border border-[#1E2740] border-r-0 rounded-l-md flex items-center justify-center hover:bg-[#12172A] transition-colors cursor-pointer"
+        style={{ zIndex: 11 }}
+        title={isOpen ? 'Collapse right panel' : 'Expand right panel'}
+      >
+        {isOpen ? (
+          <ChevronRight className="w-3.5 h-3.5 text-[#8A9BB8]" />
+        ) : (
+          <ChevronLeft className="w-3.5 h-3.5 text-[#8A9BB8]" />
+        )}
+      </button>
+      <div
+        className={`h-full bg-[#0D1221] border-l border-[#1E2740] flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+          isOpen ? 'w-80' : 'w-0 border-l-0'
+        }`}
+      >
+        <ScrollArea.Root className="flex-1 overflow-hidden">
+          <ScrollArea.Viewport className="w-full h-full" style={{ minWidth: '320px' }}>
           <div className="p-5 space-y-6">
             {/* Selected Tile Details */}
             <div>
@@ -204,6 +223,7 @@ export function RightPanel({ selectedTile, processedTrophies }: RightPanelProps)
           <ScrollArea.Thumb className="flex-1 bg-[#FFD700]/40 rounded-full relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]" />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
+      </div>
     </div>
   );
 }
