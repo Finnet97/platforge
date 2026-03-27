@@ -1,0 +1,16 @@
+{
+  "name": "PlatForge",
+  "short_name": "PlatForge",
+  "description": "PlayStation trophy gallery visualizer",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0E1A",
+  "theme_color": "#0A0E1A",
+  "icons": [
+    {
+      "src": "/trophy.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

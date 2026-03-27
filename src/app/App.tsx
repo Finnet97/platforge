@@ -1,14 +1,19 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { TopBar } from './components/TopBar';
 import { LeftPanel } from './components/LeftPanel';
 import { CenterCanvas } from './components/CenterCanvas';
 import { RightPanel } from './components/RightPanel';
-import { TemplatesModal, type TemplateSettings } from './components/TemplatesModal';
-import { YearInReviewCard } from './components/YearInReviewCard';
-import { CompareMode } from './components/CompareMode';
-import { AuthSettingsModal } from './components/AuthSettingsModal';
+import type { TemplateSettings } from './components/TemplatesModal';
+import { useIsMobile } from './components/ui/use-mobile';
+import { MobileSettingsDrawer } from './components/MobileSettingsDrawer';
+import { MobileDetailsDrawer } from './components/MobileDetailsDrawer';
 import { PsnDataProvider, usePsnData } from './context/PsnDataContext';
 import { toPng, toJpeg } from 'html-to-image';
+
+const TemplatesModal = lazy(() => import('./components/TemplatesModal').then(m => ({ default: m.TemplatesModal })));
+const YearInReviewCard = lazy(() => import('./components/YearInReviewCard').then(m => ({ default: m.YearInReviewCard })));
+const CompareMode = lazy(() => import('./components/CompareMode').then(m => ({ default: m.CompareMode })));
+const AuthSettingsModal = lazy(() => import('./components/AuthSettingsModal').then(m => ({ default: m.AuthSettingsModal })));
 
 function parseTimeToPlatinum(time: string): number {
   if (time === '--') return Infinity;
@@ -18,7 +23,10 @@ function parseTimeToPlatinum(time: string): number {
 }
 
 function AppContent() {
-  const { checkAuth, trophies } = usePsnData();
+  const { checkAuth, trophies, profile } = usePsnData();
+  const isMobile = useIsMobile();
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const [selectedTile, setSelectedTile] = useState<number | null>(0);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [showYearInReview, setShowYearInReview] = useState(false);
@@ -54,6 +62,22 @@ function AppContent() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const mosaicRef = useRef<HTMLDivElement | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const mobileTileSize = useMemo(() => {
+    if (!isMobile) return 128;
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 375;
+    const padding = 32; // p-4 * 2
+    const totalGaps = (gridSize.cols - 1) * spacing;
+    const available = viewportWidth - padding - totalGaps;
+    return Math.max(48, Math.floor(available / gridSize.cols));
+  }, [isMobile, gridSize.cols, spacing]);
+
+  const handleTileTap = useCallback((index: number) => {
+    if (isMobile) {
+      setSelectedTile(index);
+      setDetailsDrawerOpen(true);
+    }
+  }, [isMobile]);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -281,80 +305,159 @@ function AppContent() {
         onShowAuth={() => setShowAuthModal(true)}
         onExport={handleExport}
         onShare={handleShare}
+        isMobile={isMobile}
+        onOpenSettings={() => setSettingsDrawerOpen(true)}
       />
-      
-      <div className="flex-1 flex overflow-hidden">
-        <LeftPanel
-          isOpen={leftPanelOpen}
-          onToggle={() => setLeftPanelOpen(!leftPanelOpen)}
-          gridSize={gridSize}
-          setGridSize={setGridSize}
 
-          spacing={spacing}
-          setSpacing={setSpacing}
-          borderRadius={borderRadius}
-          setBorderRadius={setBorderRadius}
-          showBorders={showBorders}
-          setShowBorders={setShowBorders}
-          showGlow={showGlow}
-          setShowGlow={setShowGlow}
-          showProfile={showProfile}
-          setShowProfile={setShowProfile}
-          overlays={overlays}
-          setOverlays={setOverlays}
-          sortBy={sortBy}
-          setSortBy={handleSetSortBy}
-          platformFilter={platformFilter}
-          setPlatformFilter={setPlatformFilter}
-          bgType={bgType}
-          setBgType={setBgType}
-          bgColor={bgColor}
-          setBgColor={setBgColor}
-          showGlassmorphism={showGlassmorphism}
-          setShowGlassmorphism={setShowGlassmorphism}
-          showRarityHeatmap={showRarityHeatmap}
-          setShowRarityHeatmap={setShowRarityHeatmap}
-          fileType={fileType}
-          setFileType={setFileType}
-          useTrophyImage={useTrophyImage}
-          setUseTrophyImage={setUseTrophyImage}
-          trophyCount={processedTrophies.length}
-          profileStat={profileStat}
-          setProfileStat={setProfileStat}
-          onExport={handleExport}
-        />
+      {isMobile ? (
+        // MOBILE LAYOUT: Canvas only + drawers
+        <>
+          <CenterCanvas
+            gridSize={gridSize}
+            spacing={spacing}
+            borderRadius={borderRadius}
+            showBorders={showBorders}
+            showGlow={showGlow}
+            showProfile={showProfile}
+            profileStat={profileStat}
+            overlays={overlays}
+            processedTrophies={processedTrophies}
+            bgType={bgType}
+            bgColor={bgColor}
+            showGlassmorphism={showGlassmorphism}
+            showRarityHeatmap={showRarityHeatmap}
+            useTrophyImage={useTrophyImage}
+            selectedTile={selectedTile}
+            onSelectTile={setSelectedTile}
+            onMosaicRef={(el) => { mosaicRef.current = el; }}
+            isMobile={true}
+            tileSize={mobileTileSize}
+            onTileTap={handleTileTap}
+          />
 
-        <CenterCanvas
-          gridSize={gridSize}
+          <MobileSettingsDrawer
+            open={settingsDrawerOpen}
+            onOpenChange={setSettingsDrawerOpen}
+            gridSize={gridSize}
+            setGridSize={setGridSize}
+            spacing={spacing}
+            setSpacing={setSpacing}
+            borderRadius={borderRadius}
+            setBorderRadius={setBorderRadius}
+            showBorders={showBorders}
+            setShowBorders={setShowBorders}
+            showGlow={showGlow}
+            setShowGlow={setShowGlow}
+            showProfile={showProfile}
+            setShowProfile={setShowProfile}
+            overlays={overlays}
+            setOverlays={setOverlays}
+            sortBy={sortBy}
+            setSortBy={handleSetSortBy}
+            platformFilter={platformFilter}
+            setPlatformFilter={setPlatformFilter}
+            bgType={bgType}
+            setBgType={setBgType}
+            bgColor={bgColor}
+            setBgColor={setBgColor}
+            showGlassmorphism={showGlassmorphism}
+            setShowGlassmorphism={setShowGlassmorphism}
+            showRarityHeatmap={showRarityHeatmap}
+            setShowRarityHeatmap={setShowRarityHeatmap}
+            fileType={fileType}
+            setFileType={setFileType}
+            useTrophyImage={useTrophyImage}
+            setUseTrophyImage={setUseTrophyImage}
+            trophyCount={processedTrophies.length}
+            profileStat={profileStat}
+            setProfileStat={setProfileStat}
+            onExport={handleExport}
+          />
 
-          spacing={spacing}
-          borderRadius={borderRadius}
-          showBorders={showBorders}
-          showGlow={showGlow}
-          showProfile={showProfile}
-          profileStat={profileStat}
-          overlays={overlays}
-          processedTrophies={processedTrophies}
-          bgType={bgType}
-          bgColor={bgColor}
-          showGlassmorphism={showGlassmorphism}
-          showRarityHeatmap={showRarityHeatmap}
-          useTrophyImage={useTrophyImage}
-          selectedTile={selectedTile}
-          onSelectTile={setSelectedTile}
-          onMosaicRef={(el) => { mosaicRef.current = el; }}
-        />
+          <MobileDetailsDrawer
+            open={detailsDrawerOpen}
+            onOpenChange={setDetailsDrawerOpen}
+            selectedTrophy={selectedTile !== null ? processedTrophies[selectedTile] : null}
+            totalPlatinums={profile.totalPlatinums}
+            displayTrophies={processedTrophies.slice(0, gridSize.rows * gridSize.cols)}
+            selectedTile={selectedTile}
+            onSelectTile={setSelectedTile}
+            onReorder={handleReorder}
+          />
+        </>
+      ) : (
+        // DESKTOP LAYOUT: existing 3-column layout
+        <div className="flex-1 flex overflow-hidden">
+          <LeftPanel
+            isOpen={leftPanelOpen}
+            onToggle={() => setLeftPanelOpen(!leftPanelOpen)}
+            gridSize={gridSize}
+            setGridSize={setGridSize}
+            spacing={spacing}
+            setSpacing={setSpacing}
+            borderRadius={borderRadius}
+            setBorderRadius={setBorderRadius}
+            showBorders={showBorders}
+            setShowBorders={setShowBorders}
+            showGlow={showGlow}
+            setShowGlow={setShowGlow}
+            showProfile={showProfile}
+            setShowProfile={setShowProfile}
+            overlays={overlays}
+            setOverlays={setOverlays}
+            sortBy={sortBy}
+            setSortBy={handleSetSortBy}
+            platformFilter={platformFilter}
+            setPlatformFilter={setPlatformFilter}
+            bgType={bgType}
+            setBgType={setBgType}
+            bgColor={bgColor}
+            setBgColor={setBgColor}
+            showGlassmorphism={showGlassmorphism}
+            setShowGlassmorphism={setShowGlassmorphism}
+            showRarityHeatmap={showRarityHeatmap}
+            setShowRarityHeatmap={setShowRarityHeatmap}
+            fileType={fileType}
+            setFileType={setFileType}
+            useTrophyImage={useTrophyImage}
+            setUseTrophyImage={setUseTrophyImage}
+            trophyCount={processedTrophies.length}
+            profileStat={profileStat}
+            setProfileStat={setProfileStat}
+            onExport={handleExport}
+          />
 
-        <RightPanel
-          isOpen={rightPanelOpen}
-          onToggle={() => setRightPanelOpen(!rightPanelOpen)}
-          selectedTile={selectedTile}
-          onSelectTile={setSelectedTile}
-          processedTrophies={processedTrophies}
-          tileCount={gridSize.rows * gridSize.cols}
-          onReorder={handleReorder}
-        />
-      </div>
+          <CenterCanvas
+            gridSize={gridSize}
+            spacing={spacing}
+            borderRadius={borderRadius}
+            showBorders={showBorders}
+            showGlow={showGlow}
+            showProfile={showProfile}
+            profileStat={profileStat}
+            overlays={overlays}
+            processedTrophies={processedTrophies}
+            bgType={bgType}
+            bgColor={bgColor}
+            showGlassmorphism={showGlassmorphism}
+            showRarityHeatmap={showRarityHeatmap}
+            useTrophyImage={useTrophyImage}
+            selectedTile={selectedTile}
+            onSelectTile={setSelectedTile}
+            onMosaicRef={(el) => { mosaicRef.current = el; }}
+          />
+
+          <RightPanel
+            isOpen={rightPanelOpen}
+            onToggle={() => setRightPanelOpen(!rightPanelOpen)}
+            selectedTile={selectedTile}
+            onSelectTile={setSelectedTile}
+            processedTrophies={processedTrophies}
+            tileCount={gridSize.rows * gridSize.cols}
+            onReorder={handleReorder}
+          />
+        </div>
+      )}
 
       {/* Templates, Year Review, and Compare modals hidden for now
       {showTemplatesModal && (
@@ -370,9 +473,12 @@ function AppContent() {
       )}
       */}
 
-      {showAuthModal && (
-        <AuthSettingsModal onClose={() => setShowAuthModal(false)} />
-      )}
+      {/* Modals wrapped in Suspense for lazy loading */}
+      <Suspense fallback={null}>
+        {showAuthModal && (
+          <AuthSettingsModal onClose={() => setShowAuthModal(false)} />
+        )}
+      </Suspense>
 
       {/* Toast notification */}
       {toastMessage && (

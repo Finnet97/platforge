@@ -17,7 +17,6 @@ interface OverlaySettings {
 
 interface CenterCanvasProps {
   gridSize: { rows: number; cols: number };
-
   spacing: number;
   borderRadius: number;
   showBorders: boolean;
@@ -34,14 +33,18 @@ interface CenterCanvasProps {
   selectedTile: number | null;
   onSelectTile: (index: number) => void;
   onMosaicRef?: (el: HTMLDivElement | null) => void;
+  isMobile?: boolean;
+  tileSize?: number;
+  onTileTap?: (index: number) => void;
 }
 
 type ProfileStatType = 'none' | 'rarest' | 'topPlatform' | 'avgRarity';
 
-function ProfileCard({ profile, profileStat, processedTrophies }: {
+function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
   profile: Profile;
   profileStat: ProfileStatType;
   processedTrophies: Trophy[];
+  isMobile?: boolean;
 }) {
   const extraStat = (() => {
     if (profileStat === 'none') return null;
@@ -60,6 +63,62 @@ function ProfileCard({ profile, profileStat, processedTrophies }: {
     }
     return null;
   })();
+
+  if (isMobile) {
+    return (
+      <div className="mt-4 self-center bg-[#12172A] border border-[#1E2740] rounded-xl p-3 flex items-stretch gap-3">
+        {/* Avatar + Username */}
+        <div className="flex items-center gap-2">
+          <img
+            src={profile.avatar}
+            alt={profile.username}
+            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+            style={{
+              border: '2px solid #FFD700',
+              boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)'
+            }}
+          />
+          <div className="flex flex-col justify-center">
+            <p className="text-sm font-bold text-white leading-tight" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+              {profile.username}
+            </p>
+            <p className="text-[10px] text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Lv <span className="text-[#FFD700]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>{profile.psnLevel}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="w-px bg-[#1E2740]" />
+
+        {/* Platinums */}
+        <div className="flex flex-col items-center justify-between py-1" style={{ minWidth: '48px' }}>
+          <TrophyIcon className="w-3 h-3 text-[#FFD700]" strokeWidth={2.5} style={{ filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.4))' }} />
+          <p className="text-sm font-bold text-white leading-none" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+            {profile.totalPlatinums}
+          </p>
+          <p className="text-[9px] text-[#8A9BB8] leading-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Platinums
+          </p>
+        </div>
+
+        {/* Extra stat configurable */}
+        {extraStat && (
+          <>
+            <div className="w-px bg-[#1E2740]" />
+            <div className="flex flex-col items-center justify-between py-1" style={{ minWidth: '48px' }}>
+              <Star className="w-3 h-3 text-[#FFD700]" strokeWidth={2.5} style={{ filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.4))' }} />
+              <p className="text-sm font-bold text-white leading-none" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                {extraStat.value}
+              </p>
+              <p className="text-[9px] text-[#8A9BB8] leading-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {extraStat.label}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-8 self-center bg-[#12172A] border border-[#1E2740] rounded-xl p-5 flex items-stretch gap-6">
@@ -133,12 +192,17 @@ export function CenterCanvas({
   useTrophyImage,
   selectedTile,
   onSelectTile,
-  onMosaicRef
+  onMosaicRef,
+  isMobile,
+  tileSize,
+  onTileTap
 }: CenterCanvasProps) {
   const { profile } = usePsnData();
   const [zoom, setZoom] = useState(100);
   const [hoveredTile, setHoveredTile] = useState<number | null>(null);
   const mosaicRef = useRef<HTMLDivElement>(null);
+
+  const effectiveTileSize = tileSize ?? 128;
 
   useEffect(() => {
     onMosaicRef?.(mosaicRef.current);
@@ -158,136 +222,148 @@ export function CenterCanvas({
   const tileRadius = `${borderRadius}%`;
 
   function renderTile(trophy: Trophy, index: number, heightOverride?: number) {
+    const tileDiv = (
+      <div
+        key={trophy.id}
+        onClick={() => {
+          onSelectTile(index);
+          if (isMobile) onTileTap?.(index);
+        }}
+        onMouseEnter={() => { if (!isMobile) setHoveredTile(index); }}
+        onMouseLeave={() => { if (!isMobile) setHoveredTile(null); }}
+        className="relative cursor-pointer transition-all duration-300 group"
+        style={{
+          width: `${effectiveTileSize}px`,
+          height: heightOverride ? `${heightOverride}px` : `${effectiveTileSize}px`,
+          borderRadius: tileRadius,
+          transform: !isMobile && hoveredTile === index ? 'scale(1.05) translateY(-4px)' : selectedTile === index ? 'scale(1.02)' : 'scale(1)',
+          filter: showGlow && !isMobile && (hoveredTile === index || selectedTile === index)
+            ? 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.6))'
+            : 'none'
+        }}
+      >
+        {/* Trophy Image */}
+        <img
+          src={useTrophyImage && trophy.trophyImageUrl ? trophy.trophyImageUrl : trophy.imageUrl}
+          alt={trophy.gameTitle}
+          className="w-full h-full object-cover"
+          style={{
+            borderRadius: tileRadius,
+            border: showRarityHeatmap
+              ? `2px solid ${getRarityColor(trophy.rarity)}`
+              : showBorders ? '2px solid #FFD700' : 'none',
+            opacity: showGlassmorphism ? 0.8 : 1,
+            ...(showRarityHeatmap && {
+              boxShadow: `0 0 15px ${getRarityColor(trophy.rarity)}60`
+            })
+          }}
+        />
+
+        {/* Glassmorphism Overlay */}
+        {showGlassmorphism && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              borderRadius: tileRadius,
+              backdropFilter: 'blur(2px)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%)',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+          />
+        )}
+
+        {/* Order Number Badge */}
+        {overlays.showOrder && (
+          <div
+            className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-[#FFD700] border border-[#FFD700]/30"
+            style={{ fontFamily: 'Rajdhani, sans-serif' }}
+          >
+            #{trophy.order}
+          </div>
+        )}
+
+        {/* Rarity Badge */}
+        {overlays.showRarity && (
+          <div
+            className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-[#FFD700] border border-[#FFD700]/30"
+            style={{ fontFamily: 'Rajdhani, sans-serif' }}
+          >
+            {trophy.rarity}%
+          </div>
+        )}
+
+        {/* Platform Badge */}
+        {overlays.showPlatformIcon && (
+          <div
+            className="absolute bottom-2 right-2 w-7 h-7 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center border border-[#FFD700]/30"
+          >
+            <Gamepad2 className="w-4 h-4 text-[#FFD700]" />
+          </div>
+        )}
+
+        {/* Game Name Overlay */}
+        {overlays.showGameName && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-2"
+            style={{ borderRadius: `0 0 ${tileRadius} ${tileRadius}` }}
+          >
+            <p className="text-[10px] text-white truncate font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {trophy.gameTitle}
+            </p>
+          </div>
+        )}
+
+        {/* Date Overlay */}
+        {overlays.showDate && (
+          <div
+            className={`absolute ${overlays.showOrder ? 'top-8' : 'top-2'} left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-[9px] text-[#8A9BB8] border border-[#1E2740] flex items-center gap-1`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <Calendar className="w-2.5 h-2.5" />
+            {trophy.dateEarned.split(',')[0]}
+          </div>
+        )}
+
+        {/* Milestone Badge */}
+        {overlays.showMilestones && (trophy.order % 25 === 0 || trophy.order % 10 === 0) && (
+          <div className={`absolute ${overlays.showRarity ? 'top-8' : 'top-2'} right-2 w-6 h-6 rounded-full flex items-center justify-center ${
+            trophy.order % 25 === 0
+              ? 'bg-[#FFD700] text-black'
+              : 'bg-black/60 backdrop-blur-sm text-[#FFD700] border border-[#FFD700]/30'
+          }`}>
+            <Star className="w-3.5 h-3.5" />
+          </div>
+        )}
+
+        {/* Rarest Platinum Badge */}
+        {overlays.showRarestBadge && profile.rarestPlatinum && trophy.id === profile.rarestPlatinum.id && (
+          <div className="absolute -top-1 -right-1 w-7 h-7 bg-[#FFD700] rounded-full flex items-center justify-center shadow-lg z-10"
+            style={{ boxShadow: '0 0 12px rgba(255, 215, 0, 0.6)' }}
+          >
+            <Crown className="w-4 h-4 text-black" />
+          </div>
+        )}
+
+        {/* Selected Border */}
+        {selectedTile === index && (
+          <div
+            className="absolute inset-0 border-2 border-[#FFD700] pointer-events-none"
+            style={{
+              borderRadius: tileRadius,
+              boxShadow: '0 0 20px rgba(255, 215, 0, 0.4)'
+            }}
+          />
+        )}
+      </div>
+    );
+
+    if (isMobile) {
+      return tileDiv;
+    }
+
     return (
       <Tooltip.Root key={trophy.id} delayDuration={300}>
         <Tooltip.Trigger asChild>
-          <div
-            onClick={() => onSelectTile(index)}
-            onMouseEnter={() => setHoveredTile(index)}
-            onMouseLeave={() => setHoveredTile(null)}
-            className="relative cursor-pointer transition-all duration-300 group"
-            style={{
-              width: '128px',
-              height: heightOverride ? `${heightOverride}px` : '128px',
-              borderRadius: tileRadius,
-              transform: hoveredTile === index ? 'scale(1.05) translateY(-4px)' : selectedTile === index ? 'scale(1.02)' : 'scale(1)',
-              filter: showGlow && (hoveredTile === index || selectedTile === index)
-                ? 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.6))'
-                : 'none'
-            }}
-          >
-            {/* Trophy Image */}
-            <img
-              src={useTrophyImage && trophy.trophyImageUrl ? trophy.trophyImageUrl : trophy.imageUrl}
-              alt={trophy.gameTitle}
-              className="w-full h-full object-cover"
-              style={{
-                borderRadius: tileRadius,
-                border: showRarityHeatmap
-                  ? `2px solid ${getRarityColor(trophy.rarity)}`
-                  : showBorders ? '2px solid #FFD700' : 'none',
-                opacity: showGlassmorphism ? 0.8 : 1,
-                ...(showRarityHeatmap && {
-                  boxShadow: `0 0 15px ${getRarityColor(trophy.rarity)}60`
-                })
-              }}
-            />
-
-            {/* Glassmorphism Overlay */}
-            {showGlassmorphism && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  borderRadius: tileRadius,
-                  backdropFilter: 'blur(2px)',
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%)',
-                  border: '1px solid rgba(255,255,255,0.12)'
-                }}
-              />
-            )}
-
-            {/* Order Number Badge */}
-            {overlays.showOrder && (
-              <div
-                className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-[#FFD700] border border-[#FFD700]/30"
-                style={{ fontFamily: 'Rajdhani, sans-serif' }}
-              >
-                #{trophy.order}
-              </div>
-            )}
-
-            {/* Rarity Badge */}
-            {overlays.showRarity && (
-              <div
-                className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-[#FFD700] border border-[#FFD700]/30"
-                style={{ fontFamily: 'Rajdhani, sans-serif' }}
-              >
-                {trophy.rarity}%
-              </div>
-            )}
-
-            {/* Platform Badge */}
-            {overlays.showPlatformIcon && (
-              <div
-                className="absolute bottom-2 right-2 w-7 h-7 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center border border-[#FFD700]/30"
-              >
-                <Gamepad2 className="w-4 h-4 text-[#FFD700]" />
-              </div>
-            )}
-
-            {/* Game Name Overlay */}
-            {overlays.showGameName && (
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-2"
-                style={{ borderRadius: `0 0 ${tileRadius} ${tileRadius}` }}
-              >
-                <p className="text-[10px] text-white truncate font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  {trophy.gameTitle}
-                </p>
-              </div>
-            )}
-
-            {/* Date Overlay */}
-            {overlays.showDate && (
-              <div
-                className={`absolute ${overlays.showOrder ? 'top-8' : 'top-2'} left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-[9px] text-[#8A9BB8] border border-[#1E2740] flex items-center gap-1`}
-                style={{ fontFamily: 'Inter, sans-serif' }}
-              >
-                <Calendar className="w-2.5 h-2.5" />
-                {trophy.dateEarned.split(',')[0]}
-              </div>
-            )}
-
-            {/* Milestone Badge */}
-            {overlays.showMilestones && (trophy.order % 25 === 0 || trophy.order % 10 === 0) && (
-              <div className={`absolute ${overlays.showRarity ? 'top-8' : 'top-2'} right-2 w-6 h-6 rounded-full flex items-center justify-center ${
-                trophy.order % 25 === 0
-                  ? 'bg-[#FFD700] text-black'
-                  : 'bg-black/60 backdrop-blur-sm text-[#FFD700] border border-[#FFD700]/30'
-              }`}>
-                <Star className="w-3.5 h-3.5" />
-              </div>
-            )}
-
-            {/* Rarest Platinum Badge */}
-            {overlays.showRarestBadge && profile.rarestPlatinum && trophy.id === profile.rarestPlatinum.id && (
-              <div className="absolute -top-1 -right-1 w-7 h-7 bg-[#FFD700] rounded-full flex items-center justify-center shadow-lg z-10"
-                style={{ boxShadow: '0 0 12px rgba(255, 215, 0, 0.6)' }}
-              >
-                <Crown className="w-4 h-4 text-black" />
-              </div>
-            )}
-
-            {/* Selected Border */}
-            {selectedTile === index && (
-              <div
-                className="absolute inset-0 border-2 border-[#FFD700] pointer-events-none"
-                style={{
-                  borderRadius: tileRadius,
-                  boxShadow: '0 0 20px rgba(255, 215, 0, 0.4)'
-                }}
-              />
-            )}
-          </div>
+          {tileDiv}
         </Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content
@@ -322,7 +398,7 @@ export function CenterCanvas({
           <div
             className="grid"
             style={{
-              gridTemplateColumns: `repeat(${cols}, 128px)`,
+              gridTemplateColumns: `repeat(${cols}, ${effectiveTileSize}px)`,
               gap: `${spacing}px`
             }}
           >
@@ -356,38 +432,40 @@ export function CenterCanvas({
           }}
         />
 
-        {/* Canvas Controls */}
-        <div className="absolute top-4 right-4 z-10 bg-[#12172A]/90 backdrop-blur-md border border-[#1E2740] rounded-lg px-3 py-2 flex items-center gap-3 shadow-lg">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setZoom(Math.max(25, zoom - 25))}
-              className="w-7 h-7 flex items-center justify-center text-white hover:text-[#FFD700] transition-colors rounded"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-sm text-white min-w-[50px] text-center font-semibold" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-              {zoom}%
-            </span>
-            <button
-              onClick={() => setZoom(Math.min(200, zoom + 25))}
-              className="w-7 h-7 flex items-center justify-center text-white hover:text-[#FFD700] transition-colors rounded"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
+        {/* Canvas Controls — hidden on mobile */}
+        {!isMobile && (
+          <div className="absolute top-4 right-4 z-10 bg-[#12172A]/90 backdrop-blur-md border border-[#1E2740] rounded-lg px-3 py-2 flex items-center gap-3 shadow-lg">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setZoom(Math.max(25, zoom - 25))}
+                className="w-7 h-7 flex items-center justify-center text-white hover:text-[#FFD700] transition-colors rounded"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-sm text-white min-w-[50px] text-center font-semibold" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                {zoom}%
+              </span>
+              <button
+                onClick={() => setZoom(Math.min(200, zoom + 25))}
+                className="w-7 h-7 flex items-center justify-center text-white hover:text-[#FFD700] transition-colors rounded"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="w-px h-5 bg-[#1E2740]" />
+            <button className="w-7 h-7 flex items-center justify-center text-white hover:text-[#FFD700] transition-colors rounded">
+              <Maximize2 className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="w-px h-5 bg-[#1E2740]" />
-          <button className="w-7 h-7 flex items-center justify-center text-white hover:text-[#FFD700] transition-colors rounded">
-            <Maximize2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        )}
 
         {/* Mosaic Container */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
+        <div className={`absolute inset-0 flex flex-col items-center justify-center ${isMobile ? 'p-4' : 'p-8'}`}>
           <div
             ref={mosaicRef}
-            className="inline-flex flex-col rounded-2xl p-8 transition-all duration-300"
+            className={`inline-flex flex-col rounded-2xl transition-all duration-300 ${isMobile ? 'p-4' : 'p-8'}`}
             style={{
-              transform: `scale(${zoom / 100})`,
+              transform: isMobile ? undefined : `scale(${zoom / 100})`,
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
               ...(bgType === 'solid' && { backgroundColor: bgColor }),
               ...(bgType === 'gradient' && { background: `linear-gradient(135deg, ${bgColor}, ${bgColor}00)` }),
@@ -412,6 +490,7 @@ export function CenterCanvas({
                 profile={profile}
                 profileStat={profileStat}
                 processedTrophies={processedTrophies}
+                isMobile={isMobile}
               />
             )}
           </div>

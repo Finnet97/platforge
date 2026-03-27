@@ -23,14 +23,23 @@ No test framework is configured.
 
 **Entry flow:** `index.html` → `src/main.tsx` → `src/app/App.tsx`
 
-**App.tsx** is the root component managing UI state via `useState` and props drilling. Key state includes `gridSize` ({rows, cols}), `spacing`, `sortBy` ('date'|'alpha'|'rarity'|'platform'|'speed'|'custom'), `customOrder` (number[] of trophy IDs for manual ordering), `profileStat` ('none'|'rarest'|'topPlatform'|'avgRarity'), and many visual toggles. It renders a 7-panel layout:
-- **TopBar** — Header with PSN ID search input, logo, action buttons (Export, Share, PSN auth). Templates, Year Review, Compare, and Save buttons are hidden (logic preserved for future use). Share uses Web Share API → clipboard fallback → download fallback. Progress bar only renders during active loading.
-- **LeftPanel** — Settings controls (grid size, spacing, visual effects, sorting/filtering, profile stat selector). Collapsible via chevron toggle button on right edge. Scrollable (hidden scrollbar via Radix ScrollArea).
-- **CenterCanvas** — Main trophy grid display with zoom and profile header. Contains `ProfileCard` sub-component.
-- **RightPanel** — Selected trophy detail view and drag-to-reorder mosaic tile list. Collapsible via chevron toggle button on left edge. Uses native scroll (no Radix ScrollArea) with hidden scrollbar via `.scrollbar-hide` CSS class.
-- **TemplatesModal, YearInReviewCard, CompareMode** — Modal overlays (currently hidden, logic preserved)
+**App.tsx** is the root component managing UI state via `useState` and props drilling. Key state includes `gridSize` ({rows, cols}), `spacing`, `sortBy` ('date'|'alpha'|'rarity'|'platform'|'speed'|'custom'), `customOrder` (number[] of trophy IDs for manual ordering), `profileStat` ('none'|'rarest'|'topPlatform'|'avgRarity'), and many visual toggles. It uses `useIsMobile()` (768px breakpoint) to conditionally render **desktop** or **mobile** layouts:
 
-Both side panels support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with `transition-all duration-300 ease-in-out`. LeftPanel uses Radix ScrollArea; RightPanel uses native overflow scroll with `.scrollbar-hide`. CenterCanvas auto-expands via `flex-1`.
+**Desktop layout (≥768px):** 3-column layout — TopBar + LeftPanel + CenterCanvas + RightPanel
+- **TopBar** — Header with PSN ID search input, logo, action buttons (Export, Share, PSN auth). Templates, Year Review, Compare, and Save buttons are hidden (logic preserved for future use). Share uses Web Share API → clipboard fallback → download fallback. Progress bar only renders during active loading.
+- **LeftPanel** — Settings controls (grid size, spacing, visual effects, sorting/filtering, profile stat selector). Collapsible via chevron toggle button on right edge. Scrollable (hidden scrollbar via Radix ScrollArea). Exports `SettingsContent` sub-component (shared with mobile drawer).
+- **CenterCanvas** — Main trophy grid display with zoom and profile header. Contains `ProfileCard` sub-component. Accepts optional `isMobile`, `tileSize`, `onTileTap` props.
+- **RightPanel** — Selected trophy detail view and drag-to-reorder mosaic tile list. Collapsible via chevron toggle button on left edge. Uses native scroll with `.scrollbar-hide`. Exports `TrophyDetailContent` and `MosaicTileList` sub-components (shared with mobile drawer).
+
+**Mobile layout (<768px):** Canvas-first with bottom drawers — TopBar (2 rows) + CenterCanvas (full width) + drawers
+- **TopBar (mobile)** — Row 1: logo + share/settings/overflow menu icons. Row 2: full-width search input with GO button. Overflow menu (MoreVertical) contains Export and PSN Auth.
+- **CenterCanvas (mobile)** — Responsive tile sizing (`tileSize` computed from viewport width). No tooltips, no hover effects, no zoom controls. Tap on tile opens details drawer.
+- **MobileSettingsDrawer** — Bottom drawer (vaul) wrapping `SettingsContent`. Opens via ⚙️ button. Snap points: 50%, 90%.
+- **MobileDetailsDrawer** — Bottom drawer (vaul) wrapping `TrophyDetailContent` + `MosaicTileList`. Opens on tile tap. Snap points: 40% (preview), 85% (full + reorder).
+
+**Modals:** `TemplatesModal`, `YearInReviewCard`, `CompareMode`, `AuthSettingsModal` are lazy-loaded via `React.lazy()` (currently hidden except AuthSettingsModal, logic preserved).
+
+Both side panels (desktop) support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with `transition-all duration-300 ease-in-out`. LeftPanel uses Radix ScrollArea; RightPanel uses native overflow scroll with `.scrollbar-hide`. CenterCanvas auto-expands via `flex-1`.
 
 ### Custom Sort / Drag-to-Reorder
 
@@ -38,7 +47,7 @@ Both side panels support collapse/expand with `isOpen`/`onToggle` props (state m
 
 **Custom order:** When the user drags a tile in the RightPanel list, `sortBy` automatically switches to `'custom'` and `customOrder` (array of trophy IDs) is updated. Selecting any predefined sort clears `customOrder`. Custom order resets when a new profile is loaded.
 
-**Drag-and-drop:** Uses `react-dnd` (v16) + `HTML5Backend`. `DndProvider` wraps the RightPanel scroll content. Each tile in the "Mosaic Tiles" list is a `DraggableTile` component with `useDrag`/`useDrop` hooks. The `GripVertical` icon is the drag handle. On hover-swap, `onReorder(fromIndex, toIndex)` is called, which updates `customOrder` in App.tsx and triggers a re-render of both the grid and the list.
+**Drag-and-drop:** Uses `react-dnd` (v16) with backend selection via `src/app/utils/dndBackend.ts` — `HTML5Backend` on desktop, `TouchBackend` (with 200ms delay) on mobile. `DndProvider` wraps the RightPanel scroll content (desktop) or `MobileDetailsDrawer` content (mobile). Each tile in the "Mosaic Tiles" list is a `DraggableTile` component with `useDrag`/`useDrop` hooks. The `GripVertical` icon is the drag handle. On hover-swap, `onReorder(fromIndex, toIndex)` is called, which updates `customOrder` in App.tsx and triggers a re-render of both the grid and the list.
 
 **`src/app/components/ui/`** contains ~54 shadcn/ui components (Radix UI primitives + Tailwind). The `cn()` utility in `ui/utils.ts` merges classnames via clsx + tailwind-merge.
 
@@ -48,7 +57,7 @@ Both side panels support collapse/expand with `isOpen`/`onToggle` props (state m
 
 ### Grid & Mosaic System
 
-**Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button with best-fit algorithm that finds the most compact rectangular grid (not necessarily square) for the trophy count, preferring squarish shapes. Grid uses fixed `128px` columns (`gridTemplateColumns: repeat(cols, 128px)`) — not `1fr` — so tiles are always perfectly aligned. When the last row has fewer tiles than columns, it renders as a centered flexbox row instead of left-aligned grid cells. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content.
+**Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button with best-fit algorithm that finds the most compact rectangular grid (not necessarily square) for the trophy count, preferring squarish shapes. Grid uses fixed-size columns (`gridTemplateColumns: repeat(cols, ${tileSize}px)`) — not `1fr` — so tiles are always perfectly aligned. Desktop tile size is 128px; on mobile, tile size is computed responsively: `Math.floor((viewportWidth - padding - gaps) / cols)` with a 48px minimum. When the last row has fewer tiles than columns, it renders as a centered flexbox row instead of left-aligned grid cells. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content.
 
 **Image capture:** `captureMosaicBlob()` in App.tsx is a reusable function that captures the mosaic as a PNG Blob (handles cross-origin image proxying, scale reset, and source restoration). Used by both Export (download) and Share (Web Share API / clipboard). A simple toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for clipboard copies.
 
@@ -161,6 +170,28 @@ Legacy endpoints (`/api/auth/login`, `/api/auth/verify-2fa`, `/api/auth/cancel-2
 | `PORT` | No (default: 3001) | Server port |
 
 See `.env.example` for setup instructions.
+
+## Responsive Design
+
+**Breakpoint:** Single at 768px via `useIsMobile()` hook (`src/app/components/ui/use-mobile.ts`).
+
+**Mobile components:**
+- `src/app/components/MobileSettingsDrawer.tsx` — vaul drawer wrapping `SettingsContent`
+- `src/app/components/MobileDetailsDrawer.tsx` — vaul drawer wrapping `TrophyDetailContent` + `MosaicTileList`
+- `src/app/utils/dndBackend.ts` — Backend selector for react-dnd (HTML5 vs Touch)
+
+**Shared sub-components** (used by both desktop panels and mobile drawers):
+- `SettingsContent` (exported from `LeftPanel.tsx`) — all settings controls without scroll wrapper
+- `TrophyDetailContent` (exported from `RightPanel.tsx`) — trophy detail card
+- `MosaicTileList` (exported from `RightPanel.tsx`) — draggable tile list (expects `DndProvider` parent)
+
+**PWA:** `public/manifest.json` enables "Add to Home Screen". Meta tags for SEO/social sharing in `index.html`.
+
+## Production Build
+
+- `vite-plugin-compression` generates gzip + brotli pre-compressed assets
+- Modals are lazy-loaded via `React.lazy()` (code-split into separate chunks)
+- Asset hashing enabled for cache busting
 
 ## Known Constraints
 
