@@ -310,17 +310,33 @@ export function CenterCanvas({
   }
 
   function renderGridLayout() {
+    const cols = gridSize.cols;
+    const lastRowCount = displayTrophies.length % cols;
+    const hasIncompleteRow = lastRowCount > 0;
+    const fullRowTrophies = hasIncompleteRow ? displayTrophies.slice(0, -lastRowCount) : displayTrophies;
+    const lastRowTrophies = hasIncompleteRow ? displayTrophies.slice(-lastRowCount) : [];
+
     return (
-      <div className="flex justify-center">
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns: `repeat(${gridSize.cols}, 128px)`,
-            gap: `${spacing}px`
-          }}
-        >
-          {displayTrophies.map((trophy, index) => renderTile(trophy, index))}
-        </div>
+      <div className="flex flex-col items-center">
+        {fullRowTrophies.length > 0 && (
+          <div
+            className="grid"
+            style={{
+              gridTemplateColumns: `repeat(${cols}, 128px)`,
+              gap: `${spacing}px`
+            }}
+          >
+            {fullRowTrophies.map((trophy, index) => renderTile(trophy, index))}
+          </div>
+        )}
+        {lastRowTrophies.length > 0 && (
+          <div
+            className="flex justify-center"
+            style={{ gap: `${spacing}px`, marginTop: fullRowTrophies.length > 0 ? `${spacing}px` : 0 }}
+          >
+            {lastRowTrophies.map((trophy, index) => renderTile(trophy, fullRowTrophies.length + index))}
+          </div>
+        )}
       </div>
     );
   }

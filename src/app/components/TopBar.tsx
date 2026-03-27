@@ -5,14 +5,12 @@ import * as Progress from '@radix-ui/react-progress';
 import { usePsnData } from '../context/PsnDataContext';
 
 interface TopBarProps {
-  onShowTemplates: () => void;
-  onShowYearInReview: () => void;
-  onShowCompare: () => void;
   onShowAuth: () => void;
   onExport: (format: 'png' | 'jpeg') => void;
+  onShare: () => void;
 }
 
-export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onShowAuth, onExport }: TopBarProps) {
+export function TopBar({ onShowAuth, onExport, onShare }: TopBarProps) {
   const { isAuthenticated, canSearch, isLoading, loadingProgress, loadProfile, profile, error } = usePsnData();
   const [psnInput, setPsnInput] = useState(profile.username);
 
@@ -101,29 +99,7 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
             {isAuthenticated ? 'Connected' : 'PSN'}
           </button>
 
-          <button
-            onClick={onShowTemplates}
-            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Templates
-          </button>
-
-          <button
-            onClick={onShowYearInReview}
-            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors whitespace-nowrap"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Year Review
-          </button>
-
-          <button
-            onClick={onShowCompare}
-            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Compare
-          </button>
+          {/* Templates, Year Review, and Compare buttons hidden for now */}
 
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
@@ -155,15 +131,16 @@ export function TopBar({ onShowTemplates, onShowYearInReview, onShowCompare, onS
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
 
-          <button className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors flex items-center gap-1.5" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <button
+            onClick={onShare}
+            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors flex items-center gap-1.5"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
             <Share2 className="w-3.5 h-3.5" />
             Share
           </button>
 
-          <button className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-white text-sm rounded-lg hover:border-[#FFD700] transition-colors flex items-center gap-1.5 whitespace-nowrap" style={{ fontFamily: 'Inter, sans-serif' }}>
-            <Save className="w-3.5 h-3.5" />
-            Save
-          </button>
+          {/* Save button hidden for now */}
         </div>
       </div>
 

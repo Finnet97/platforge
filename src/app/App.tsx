@@ -53,11 +53,17 @@ function AppContent() {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const mosaicRef = useRef<HTMLDivElement | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
+  /** Captures the mosaic as a PNG Blob, handling cross-origin images via proxy. */
+  const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
     const el = mosaicRef.current;
-    if (!el) return;
-    const exportFormat = format || fileType;
+    if (!el) return null;
     const originalTransform = el.style.transform;
     el.style.transform = 'scale(1)';
 
@@ -86,19 +92,105 @@ function AppContent() {
     );
 
     try {
-      const dataUrl = exportFormat === 'png'
-        ? await toPng(el, { pixelRatio: 2 })
-        : await toJpeg(el, { quality: 0.95 });
-      const link = document.createElement('a');
-      link.download = `platforge-${Date.now()}.${exportFormat}`;
-      link.href = dataUrl;
-      link.click();
+      const dataUrl = await toPng(el, { pixelRatio: 2 });
+      const res = await fetch(dataUrl);
+      return await res.blob();
     } finally {
       el.style.transform = originalTransform;
-      // Restore original image sources
       originals.forEach(({ img, src }) => { img.src = src; });
     }
-  }, [fileType]);
+  }, []);
+
+  const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
+    const el = mosaicRef.current;
+    if (!el) return;
+    const exportFormat = format || fileType;
+
+    if (exportFormat === 'png') {
+      const blob = await captureMosaicBlob();
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `platforge-${Date.now()}.png`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      // JPEG path: capture directly since captureMosaicBlob is PNG-only
+      const originalTransform = el.style.transform;
+      el.style.transform = 'scale(1)';
+      const imgs = el.querySelectorAll('img');
+      const originals: { img: HTMLImageElement; src: string }[] = [];
+      await Promise.all(
+        Array.from(imgs).map(async (img) => {
+          try {
+            const src = img.src;
+            if (!src || src.startsWith('data:')) return;
+            originals.push({ img, src });
+            const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(src)}`;
+            const resp = await fetch(proxyUrl);
+            const blob = await resp.blob();
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            img.src = dataUrl;
+          } catch {
+            // Keep original src if proxy fails
+          }
+        })
+      );
+      try {
+        const dataUrl = await toJpeg(el, { quality: 0.95 });
+        const link = document.createElement('a');
+        link.download = `platforge-${Date.now()}.jpeg`;
+        link.href = dataUrl;
+        link.click();
+      } finally {
+        el.style.transform = originalTransform;
+        originals.forEach(({ img, src }) => { img.src = src; });
+      }
+    }
+  }, [fileType, captureMosaicBlob]);
+
+  const handleShare = useCallback(async () => {
+    const blob = await captureMosaicBlob();
+    if (!blob) return;
+
+    const file = new File([blob], `platforge-${Date.now()}.png`, { type: 'image/png' });
+
+    // Try native Web Share API with file support
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'PlatForge' });
+        return;
+      } catch (err) {
+        // User cancelled share — not an error
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+
+    // Fallback: copy image to clipboard
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob }),
+      ]);
+      showToast('Imagen copiada al portapapeles');
+      return;
+    } catch {
+      // Clipboard API not available
+    }
+
+    // Final fallback: download
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `platforge-${Date.now()}.png`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Imagen descargada');
+  }, [captureMosaicBlob, showToast]);
 
   const handleApplyTemplate = useCallback((settings: TemplateSettings) => {
     setGridSize(settings.gridSize);
@@ -186,11 +278,9 @@ function AppContent() {
   return (
     <div className="h-screen w-full flex flex-col bg-[#0A0E1A] text-white overflow-hidden">
       <TopBar
-        onShowTemplates={() => setShowTemplatesModal(true)}
-        onShowYearInReview={() => setShowYearInReview(true)}
-        onShowCompare={() => setShowCompareMode(true)}
         onShowAuth={() => setShowAuthModal(true)}
         onExport={handleExport}
+        onShare={handleShare}
       />
       
       <div className="flex-1 flex overflow-hidden">
@@ -266,6 +356,7 @@ function AppContent() {
         />
       </div>
 
+      {/* Templates, Year Review, and Compare modals hidden for now
       {showTemplatesModal && (
         <TemplatesModal onClose={() => setShowTemplatesModal(false)} onApply={handleApplyTemplate} />
       )}
@@ -277,9 +368,19 @@ function AppContent() {
       {showCompareMode && (
         <CompareMode onClose={() => setShowCompareMode(false)} />
       )}
+      */}
 
       {showAuthModal && (
         <AuthSettingsModal onClose={() => setShowAuthModal(false)} />
+      )}
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-[#12172A] border border-[#1E2740] rounded-lg shadow-xl animate-fade-in-up">
+          <p className="text-sm text-white whitespace-nowrap" style={{ fontFamily: 'Inter, sans-serif' }}>
+            {toastMessage}
+          </p>
+        </div>
       )}
     </div>
   );

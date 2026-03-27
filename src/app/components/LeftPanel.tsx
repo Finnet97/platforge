@@ -142,11 +142,29 @@ export function LeftPanel({
                   ))}
                   <button
                     onClick={() => {
-                      const auto = Math.max(3, Math.ceil(Math.sqrt(trophyCount)));
-                      setGridSize({ rows: auto, cols: auto });
+                      const n = trophyCount;
+                      if (n <= 0) { setGridSize({ rows: 3, cols: 3 }); return; }
+                      // Find best-fit rectangular grid: prefer squarish with minimal waste
+                      const sqrtN = Math.sqrt(n);
+                      let bestRows = n, bestCols = 1, bestScore = Infinity;
+                      for (let cols = 1; cols <= n; cols++) {
+                        const rows = Math.ceil(n / cols);
+                        if (rows < cols) break; // only check rows >= cols (portrait/square)
+                        const waste = rows * cols - n;
+                        const diff = Math.abs(rows - cols);
+                        // Score: heavily penalize non-squarish shapes, lightly penalize waste
+                        const score = diff * sqrtN + waste;
+                        if (score < bestScore) {
+                          bestRows = rows;
+                          bestCols = cols;
+                          bestScore = score;
+                        }
+                      }
+                      // Prefer landscape (more cols than rows) for wider mosaics
+                      setGridSize({ rows: Math.min(bestRows, bestCols), cols: Math.max(bestRows, bestCols) });
                     }}
                     className={`h-12 rounded-lg border-2 transition-all ${
-                      gridSize.rows === gridSize.cols && ![3, 4, 5, 6, 7, 8, 10].includes(gridSize.rows)
+                      !([3, 4, 5, 6, 7, 8, 10].some(s => gridSize.rows === s && gridSize.cols === s))
                         ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
                         : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
                     }`}

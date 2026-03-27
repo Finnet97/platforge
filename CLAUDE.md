@@ -24,11 +24,11 @@ No test framework is configured.
 **Entry flow:** `index.html` → `src/main.tsx` → `src/app/App.tsx`
 
 **App.tsx** is the root component managing UI state via `useState` and props drilling. Key state includes `gridSize` ({rows, cols}), `spacing`, `sortBy` ('date'|'alpha'|'rarity'|'platform'|'speed'|'custom'), `customOrder` (number[] of trophy IDs for manual ordering), `profileStat` ('none'|'rarest'|'topPlatform'|'avgRarity'), and many visual toggles. It renders a 7-panel layout:
-- **TopBar** — Header with PSN ID search input, logo, action buttons. Progress bar only renders during active loading.
+- **TopBar** — Header with PSN ID search input, logo, action buttons (Export, Share, PSN auth). Templates, Year Review, Compare, and Save buttons are hidden (logic preserved for future use). Share uses Web Share API → clipboard fallback → download fallback. Progress bar only renders during active loading.
 - **LeftPanel** — Settings controls (grid size, spacing, visual effects, sorting/filtering, profile stat selector). Collapsible via chevron toggle button on right edge. Scrollable (hidden scrollbar via Radix ScrollArea).
 - **CenterCanvas** — Main trophy grid display with zoom and profile header. Contains `ProfileCard` sub-component.
 - **RightPanel** — Selected trophy detail view and drag-to-reorder mosaic tile list. Collapsible via chevron toggle button on left edge. Uses native scroll (no Radix ScrollArea) with hidden scrollbar via `.scrollbar-hide` CSS class.
-- **TemplatesModal, YearInReviewCard, CompareMode** — Modal overlays
+- **TemplatesModal, YearInReviewCard, CompareMode** — Modal overlays (currently hidden, logic preserved)
 
 Both side panels support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with `transition-all duration-300 ease-in-out`. LeftPanel uses Radix ScrollArea; RightPanel uses native overflow scroll with `.scrollbar-hide`. CenterCanvas auto-expands via `flex-1`.
 
@@ -48,7 +48,9 @@ Both side panels support collapse/expand with `isOpen`/`onToggle` props (state m
 
 ### Grid & Mosaic System
 
-**Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button that computes `Math.ceil(Math.sqrt(trophyCount))` for optimal square grid. Only grid layout is supported (hexagonal and masonry were removed). Grid uses fixed `128px` columns (`gridTemplateColumns: repeat(cols, 128px)`) — not `1fr` — so tiles are always perfectly aligned. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content; the grid is centered via a `flex justify-center` wrapper so it stays centered when the profile card is wider.
+**Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button with best-fit algorithm that finds the most compact rectangular grid (not necessarily square) for the trophy count, preferring squarish shapes. Grid uses fixed `128px` columns (`gridTemplateColumns: repeat(cols, 128px)`) — not `1fr` — so tiles are always perfectly aligned. When the last row has fewer tiles than columns, it renders as a centered flexbox row instead of left-aligned grid cells. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content.
+
+**Image capture:** `captureMosaicBlob()` in App.tsx is a reusable function that captures the mosaic as a PNG Blob (handles cross-origin image proxying, scale reset, and source restoration). Used by both Export (download) and Share (Web Share API / clipboard). A simple toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for clipboard copies.
 
 **ProfileCard** (`CenterCanvas.tsx`): Compact, self-centering card (`self-center`) below the grid. Shows avatar + username/level + platinum count + optional configurable stat (rarest %, top platform, avg rarity, or none). The configurable stat is controlled by `profileStat` state in App.tsx and selectable via "Extra Stat" dropdown in LeftPanel (visible only when "Show Header" is on).
 
