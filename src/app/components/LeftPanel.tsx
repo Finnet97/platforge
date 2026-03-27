@@ -4,15 +4,14 @@ import * as Slider from '@radix-ui/react-slider';
 import * as Switch from '@radix-ui/react-switch';
 import * as Select from '@radix-ui/react-select';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
-import { ChevronDown, ChevronLeft, ChevronRight, Grid3x3, Hexagon, LayoutGrid, Sparkles, Clock } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Sparkles, Clock } from 'lucide-react';
 
 interface LeftPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   gridSize: { rows: number; cols: number };
   setGridSize: (size: { rows: number; cols: number }) => void;
-  layoutStyle: string;
-  setLayoutStyle: (style: string) => void;
+
   spacing: number;
   setSpacing: (spacing: number) => void;
   borderRadius: number;
@@ -33,7 +32,7 @@ interface LeftPanelProps {
     showRarestBadge: boolean;
   };
   setOverlays: (overlays: LeftPanelProps['overlays']) => void;
-  sortBy: 'date' | 'alpha' | 'rarity' | 'platform' | 'speed';
+  sortBy: 'date' | 'alpha' | 'rarity' | 'platform' | 'speed' | 'custom';
   setSortBy: (sort: LeftPanelProps['sortBy']) => void;
   platformFilter: string;
   setPlatformFilter: (filter: string) => void;
@@ -78,8 +77,7 @@ export function LeftPanel({
   onToggle,
   gridSize,
   setGridSize,
-  layoutStyle,
-  setLayoutStyle,
+
   spacing,
   setSpacing,
   borderRadius,
@@ -159,44 +157,6 @@ export function LeftPanel({
                 </div>
               </div>
 
-              <div>
-                <label className="text-sm text-white mb-3 block" style={{ fontFamily: 'Inter, sans-serif' }}>Layout Style</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setLayoutStyle('grid')}
-                    className={`h-16 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all ${
-                      layoutStyle === 'grid'
-                        ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
-                        : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
-                    }`}
-                  >
-                    <Grid3x3 className="w-5 h-5" />
-                    <span className="text-xs" style={{ fontFamily: 'Inter, sans-serif' }}>Grid</span>
-                  </button>
-                  <button
-                    onClick={() => setLayoutStyle('hexagonal')}
-                    className={`h-16 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all ${
-                      layoutStyle === 'hexagonal'
-                        ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
-                        : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
-                    }`}
-                  >
-                    <Hexagon className="w-5 h-5" />
-                    <span className="text-xs" style={{ fontFamily: 'Inter, sans-serif' }}>Hex</span>
-                  </button>
-                  <button
-                    onClick={() => setLayoutStyle('masonry')}
-                    className={`h-16 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all ${
-                      layoutStyle === 'masonry'
-                        ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
-                        : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
-                    }`}
-                  >
-                    <LayoutGrid className="w-5 h-5" />
-                    <span className="text-xs" style={{ fontFamily: 'Inter, sans-serif' }}>Masonry</span>
-                  </button>
-                </div>
-              </div>
 
               <div>
                 <div className="flex justify-between items-center mb-2">
@@ -432,6 +392,7 @@ export function LeftPanel({
                   <option value="rarity">Rarity</option>
                   <option value="platform">Platform</option>
                   <option value="speed">Speed</option>
+                  <option value="custom">Custom (Drag)</option>
                 </select>
               </div>
               <div>

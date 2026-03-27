@@ -3,8 +3,7 @@ import { Trophy as TrophyIcon, ZoomIn, ZoomOut, Maximize2, Gamepad2, Crown, Star
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { usePsnData, type Profile } from '../context/PsnDataContext';
 import type { Trophy } from '../data/mockData';
-// @ts-expect-error -- no type declarations for react-responsive-masonry
-import Masonry from 'react-responsive-masonry';
+
 
 interface OverlaySettings {
   showOrder: boolean;
@@ -18,7 +17,7 @@ interface OverlaySettings {
 
 interface CenterCanvasProps {
   gridSize: { rows: number; cols: number };
-  layoutStyle: string;
+
   spacing: number;
   borderRadius: number;
   showBorders: boolean;
@@ -119,7 +118,6 @@ function ProfileCard({ profile, profileStat, processedTrophies }: {
 
 export function CenterCanvas({
   gridSize,
-  layoutStyle,
   spacing,
   borderRadius,
   showBorders,
@@ -157,8 +155,7 @@ export function CenterCanvas({
     return '#8A9BB8';
   };
 
-  const tileRadius = layoutStyle === 'hexagonal' ? '0' : `${borderRadius}%`;
-  const hexClip = 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)';
+  const tileRadius = `${borderRadius}%`;
 
   function renderTile(trophy: Trophy, index: number, heightOverride?: number) {
     return (
@@ -173,7 +170,6 @@ export function CenterCanvas({
               width: '128px',
               height: heightOverride ? `${heightOverride}px` : '128px',
               borderRadius: tileRadius,
-              ...(layoutStyle === 'hexagonal' && { clipPath: hexClip }),
               transform: hoveredTile === index ? 'scale(1.05) translateY(-4px)' : selectedTile === index ? 'scale(1.02)' : 'scale(1)',
               filter: showGlow && (hoveredTile === index || selectedTile === index)
                 ? 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.6))'
@@ -187,7 +183,6 @@ export function CenterCanvas({
               className="w-full h-full object-cover"
               style={{
                 borderRadius: tileRadius,
-                ...(layoutStyle === 'hexagonal' && { clipPath: hexClip }),
                 border: showRarityHeatmap
                   ? `2px solid ${getRarityColor(trophy.rarity)}`
                   : showBorders ? '2px solid #FFD700' : 'none',
@@ -204,7 +199,6 @@ export function CenterCanvas({
                 className="absolute inset-0 pointer-events-none"
                 style={{
                   borderRadius: tileRadius,
-                  ...(layoutStyle === 'hexagonal' && { clipPath: hexClip }),
                   backdropFilter: 'blur(2px)',
                   background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%)',
                   border: '1px solid rgba(255,255,255,0.12)'
@@ -289,7 +283,6 @@ export function CenterCanvas({
                 className="absolute inset-0 border-2 border-[#FFD700] pointer-events-none"
                 style={{
                   borderRadius: tileRadius,
-                  ...(layoutStyle === 'hexagonal' && { clipPath: hexClip }),
                   boxShadow: '0 0 20px rgba(255, 215, 0, 0.4)'
                 }}
               />
@@ -332,48 +325,7 @@ export function CenterCanvas({
     );
   }
 
-  function renderHexLayout() {
-    const rows: Trophy[][] = [];
-    for (let i = 0; i < displayTrophies.length; i += gridSize.cols) {
-      rows.push(displayTrophies.slice(i, i + gridSize.cols));
-    }
-    const tileSize = 128;
-    const verticalSpacing = tileSize * 0.75 + spacing;
 
-    return (
-      <div className="flex flex-col items-center" style={{ gap: '0px' }}>
-        {rows.map((row, rowIndex) => (
-          <div
-            key={rowIndex}
-            className="flex"
-            style={{
-              gap: `${spacing}px`,
-              marginTop: rowIndex === 0 ? '0' : `${verticalSpacing - tileSize}px`,
-              transform: rowIndex % 2 === 1 ? `translateX(${(tileSize + spacing) / 2}px)` : 'none'
-            }}
-          >
-            {row.map((trophy, colIndex) => {
-              const globalIndex = rowIndex * gridSize.cols + colIndex;
-              return renderTile(trophy, globalIndex);
-            })}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function renderMasonryLayout() {
-    return (
-      <Masonry columnsCount={gridSize.cols} gutter={`${spacing}px`}>
-        {displayTrophies.map((trophy, index) => {
-          const baseHeight = 128;
-          const rarityFactor = 1 + (1 - Math.min(trophy.rarity, 50) / 50) * 0.6;
-          const height = Math.round(baseHeight * rarityFactor);
-          return renderTile(trophy, index, height);
-        })}
-      </Masonry>
-    );
-  }
 
   return (
     <Tooltip.Provider>
@@ -436,9 +388,7 @@ export function CenterCanvas({
             }}
           >
             {/* Layout Rendering */}
-            {layoutStyle === 'grid' && renderGridLayout()}
-            {layoutStyle === 'hexagonal' && renderHexLayout()}
-            {layoutStyle === 'masonry' && renderMasonryLayout()}
+            {renderGridLayout()}
 
             {/* Profile Header */}
             {showProfile && (

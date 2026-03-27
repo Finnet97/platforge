@@ -135,6 +135,7 @@
 
   html {
     font-size: var(--font-size);
+    overflow-x: hidden;
   }
 
   h1 {
@@ -178,4 +179,12 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

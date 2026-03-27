@@ -25,7 +25,7 @@ function AppContent() {
   const [showCompareMode, setShowCompareMode] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [gridSize, setGridSize] = useState({ rows: 5, cols: 5 });
-  const [layoutStyle, setLayoutStyle] = useState('grid');
+
   const [spacing, setSpacing] = useState(8);
   const [borderRadius, setBorderRadius] = useState(12);
   const [showBorders, setShowBorders] = useState(true);
@@ -40,7 +40,8 @@ function AppContent() {
     showMilestones: false,
     showRarestBadge: false,
   });
-  const [sortBy, setSortBy] = useState<'date' | 'alpha' | 'rarity' | 'platform' | 'speed'>('date');
+  const [sortBy, setSortBy] = useState<'date' | 'alpha' | 'rarity' | 'platform' | 'speed' | 'custom'>('date');
+  const [customOrder, setCustomOrder] = useState<number[]>([]);
   const [platformFilter, setPlatformFilter] = useState('ALL');
   const [bgType, setBgType] = useState<'solid' | 'gradient' | 'pattern' | 'transparent'>('solid');
   const [bgColor, setBgColor] = useState('#0A0E1A');
@@ -101,7 +102,7 @@ function AppContent() {
 
   const handleApplyTemplate = useCallback((settings: TemplateSettings) => {
     setGridSize(settings.gridSize);
-    setLayoutStyle(settings.layoutStyle);
+
     setSpacing(settings.spacing);
     setBorderRadius(settings.borderRadius);
     setShowBorders(settings.showBorders);
@@ -136,17 +137,54 @@ function AppContent() {
       case 'speed':
         result.sort((a, b) => parseTimeToPlatinum(a.timeToPlatinum) - parseTimeToPlatinum(b.timeToPlatinum));
         break;
+      case 'custom':
+        if (customOrder.length > 0) {
+          const orderMap = new Map(customOrder.map((id, idx) => [id, idx]));
+          result.sort((a, b) => {
+            const posA = orderMap.get(a.id) ?? Infinity;
+            const posB = orderMap.get(b.id) ?? Infinity;
+            return posA - posB;
+          });
+        }
+        break;
     }
 
     return result;
-  }, [trophies, platformFilter, sortBy]);
+  }, [trophies, platformFilter, sortBy, customOrder]);
+
+  const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
+    const currentIds = processedTrophies.map(t => t.id);
+    setSortBy('custom');
+    setCustomOrder(() => {
+      const updated = [...currentIds];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
+  }, [processedTrophies]);
+
+  const handleSetSortBy = useCallback((sort: typeof sortBy) => {
+    setSortBy(sort);
+    if (sort !== 'custom') {
+      setCustomOrder([]);
+    }
+  }, []);
+
+  // Reset custom order when trophies change (new profile loaded)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setCustomOrder([]);
+    if (sortBy === 'custom') {
+      setSortBy('date');
+    }
+  }, [trophies]);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#0A0E1A] text-white overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-[#0A0E1A] text-white overflow-hidden">
       <TopBar
         onShowTemplates={() => setShowTemplatesModal(true)}
         onShowYearInReview={() => setShowYearInReview(true)}
@@ -161,8 +199,7 @@ function AppContent() {
           onToggle={() => setLeftPanelOpen(!leftPanelOpen)}
           gridSize={gridSize}
           setGridSize={setGridSize}
-          layoutStyle={layoutStyle}
-          setLayoutStyle={setLayoutStyle}
+
           spacing={spacing}
           setSpacing={setSpacing}
           borderRadius={borderRadius}
@@ -176,7 +213,7 @@ function AppContent() {
           overlays={overlays}
           setOverlays={setOverlays}
           sortBy={sortBy}
-          setSortBy={setSortBy}
+          setSortBy={handleSetSortBy}
           platformFilter={platformFilter}
           setPlatformFilter={setPlatformFilter}
           bgType={bgType}
@@ -199,7 +236,7 @@ function AppContent() {
 
         <CenterCanvas
           gridSize={gridSize}
-          layoutStyle={layoutStyle}
+
           spacing={spacing}
           borderRadius={borderRadius}
           showBorders={showBorders}
@@ -222,7 +259,10 @@ function AppContent() {
           isOpen={rightPanelOpen}
           onToggle={() => setRightPanelOpen(!rightPanelOpen)}
           selectedTile={selectedTile}
+          onSelectTile={setSelectedTile}
           processedTrophies={processedTrophies}
+          tileCount={gridSize.rows * gridSize.cols}
+          onReorder={handleReorder}
         />
       </div>
 

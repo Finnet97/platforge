@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 
 export interface TemplateSettings {
   gridSize: { rows: number; cols: number };
-  layoutStyle: string;
+
   spacing: number;
   borderRadius: number;
   showBorders: boolean;
@@ -39,7 +39,7 @@ const templates: Array<{
     preview: 'https://images.unsplash.com/photo-1580327332925-a10e6cb11baa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400',
     settings: {
       gridSize: { rows: 5, cols: 5 },
-      layoutStyle: 'grid',
+
       spacing: 4,
       borderRadius: 0,
       showBorders: false,
@@ -57,7 +57,7 @@ const templates: Array<{
     preview: 'https://images.unsplash.com/photo-1754300681803-61eadeb79d10?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400',
     settings: {
       gridSize: { rows: 4, cols: 4 },
-      layoutStyle: 'grid',
+
       spacing: 8,
       borderRadius: 12,
       showBorders: true,
@@ -75,7 +75,7 @@ const templates: Array<{
     preview: 'https://images.unsplash.com/photo-1739184523594-564cb9b61126?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400',
     settings: {
       gridSize: { rows: 5, cols: 5 },
-      layoutStyle: 'grid',
+
       spacing: 6,
       borderRadius: 8,
       showBorders: true,
@@ -93,7 +93,7 @@ const templates: Array<{
     preview: 'https://images.unsplash.com/photo-1644571580854-114d7d8fa383?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400',
     settings: {
       gridSize: { rows: 4, cols: 4 },
-      layoutStyle: 'grid',
+
       spacing: 2,
       borderRadius: 0,
       showBorders: true,
@@ -111,7 +111,7 @@ const templates: Array<{
     preview: 'https://images.unsplash.com/photo-1668119064876-2ac62994e145?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400',
     settings: {
       gridSize: { rows: 4, cols: 4 },
-      layoutStyle: 'grid',
+
       spacing: 12,
       borderRadius: 50,
       showBorders: false,
@@ -129,7 +129,7 @@ const templates: Array<{
     preview: 'https://images.unsplash.com/photo-1580327332925-a10e6cb11baa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400',
     settings: {
       gridSize: { rows: 5, cols: 5 },
-      layoutStyle: 'grid',
+
       spacing: 8,
       borderRadius: 16,
       showBorders: true,
