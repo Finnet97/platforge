@@ -48,6 +48,7 @@ function AppContent() {
   const [showRarityHeatmap, setShowRarityHeatmap] = useState(false);
   const [fileType, setFileType] = useState<'png' | 'jpeg'>('png');
   const [useTrophyImage, setUseTrophyImage] = useState(false);
+  const [profileStat, setProfileStat] = useState<'none' | 'rarest' | 'topPlatform' | 'avgRarity'>('rarest');
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const mosaicRef = useRef<HTMLDivElement | null>(null);
@@ -190,10 +191,13 @@ function AppContent() {
           setFileType={setFileType}
           useTrophyImage={useTrophyImage}
           setUseTrophyImage={setUseTrophyImage}
+          trophyCount={processedTrophies.length}
+          profileStat={profileStat}
+          setProfileStat={setProfileStat}
           onExport={handleExport}
         />
-        
-        <CenterCanvas 
+
+        <CenterCanvas
           gridSize={gridSize}
           layoutStyle={layoutStyle}
           spacing={spacing}
@@ -201,6 +205,7 @@ function AppContent() {
           showBorders={showBorders}
           showGlow={showGlow}
           showProfile={showProfile}
+          profileStat={profileStat}
           overlays={overlays}
           processedTrophies={processedTrophies}
           bgType={bgType}

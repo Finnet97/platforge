@@ -217,10 +217,10 @@ export function RightPanel({ isOpen, onToggle, selectedTile, processedTrophies }
           </div>
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar
-          className="flex touch-none select-none p-0.5 bg-transparent transition-colors duration-150 ease-out hover:bg-[#1E2740] data-[orientation=vertical]:w-2.5"
+          className="hidden"
           orientation="vertical"
         >
-          <ScrollArea.Thumb className="flex-1 bg-[#FFD700]/40 rounded-full relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]" />
+          <ScrollArea.Thumb />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
       </div>

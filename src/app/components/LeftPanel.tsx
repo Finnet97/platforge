@@ -49,6 +49,9 @@ interface LeftPanelProps {
   setFileType: (type: 'png' | 'jpeg') => void;
   useTrophyImage: boolean;
   setUseTrophyImage: (use: boolean) => void;
+  trophyCount: number;
+  profileStat: 'none' | 'rarest' | 'topPlatform' | 'avgRarity';
+  setProfileStat: (stat: LeftPanelProps['profileStat']) => void;
   onExport: (format: 'png' | 'jpeg') => void;
 }
 
@@ -105,6 +108,9 @@ export function LeftPanel({
   setFileType,
   useTrophyImage,
   setUseTrophyImage,
+  trophyCount,
+  profileStat,
+  setProfileStat,
   onExport
 }: LeftPanelProps) {
   return (
@@ -114,7 +120,7 @@ export function LeftPanel({
           isOpen ? 'w-80' : 'w-0 border-r-0'
         }`}
       >
-        <ScrollArea.Root className="flex-1">
+        <ScrollArea.Root className="flex-1 overflow-hidden">
           <ScrollArea.Viewport className="w-full h-full" style={{ minWidth: '320px' }}>
           {/* LAYOUT Section */}
           <ControlSection title="Layout">
@@ -122,12 +128,12 @@ export function LeftPanel({
               <div>
                 <label className="text-sm text-white mb-3 block" style={{ fontFamily: 'Inter, sans-serif' }}>Grid Size</label>
                 <div className="grid grid-cols-4 gap-2">
-                  {[3, 4, 5, 6].map(size => (
+                  {[3, 4, 5, 6, 7, 8, 10].map(size => (
                     <button
                       key={size}
                       onClick={() => setGridSize({ rows: size, cols: size })}
                       className={`h-12 rounded-lg border-2 transition-all ${
-                        gridSize.rows === size
+                        gridSize.rows === size && gridSize.cols === size
                           ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
                           : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
                       }`}
@@ -136,6 +142,20 @@ export function LeftPanel({
                       {size}×{size}
                     </button>
                   ))}
+                  <button
+                    onClick={() => {
+                      const auto = Math.max(3, Math.ceil(Math.sqrt(trophyCount)));
+                      setGridSize({ rows: auto, cols: auto });
+                    }}
+                    className={`h-12 rounded-lg border-2 transition-all ${
+                      gridSize.rows === gridSize.cols && ![3, 4, 5, 6, 7, 8, 10].includes(gridSize.rows)
+                        ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
+                        : 'border-[#1E2740] bg-[#12172A] text-white hover:border-[#FFD700]/50'
+                    }`}
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  >
+                    Auto
+                  </button>
                 </div>
               </div>
 
@@ -376,6 +396,23 @@ export function LeftPanel({
                   <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
                 </Switch.Root>
               </div>
+
+              {showProfile && (
+                <div>
+                  <label className="text-sm text-white mb-2 block" style={{ fontFamily: 'Inter, sans-serif' }}>Extra Stat</label>
+                  <select
+                    value={profileStat}
+                    onChange={(e) => setProfileStat(e.target.value as LeftPanelProps['profileStat'])}
+                    className="w-full h-10 rounded-lg border-2 border-[#1E2740] bg-[#12172A] text-white px-3 text-sm"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  >
+                    <option value="none">None</option>
+                    <option value="rarest">Rarest %</option>
+                    <option value="topPlatform">Top Platform</option>
+                    <option value="avgRarity">Avg Rarity</option>
+                  </select>
+                </div>
+              )}
             </div>
           </ControlSection>
 
@@ -479,10 +516,10 @@ export function LeftPanel({
           </ControlSection>
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar
-          className="flex touch-none select-none p-0.5 bg-transparent transition-colors duration-150 ease-out hover:bg-[#1E2740] data-[orientation=vertical]:w-2.5"
+          className="hidden"
           orientation="vertical"
         >
-          <ScrollArea.Thumb className="flex-1 bg-[#FFD700]/40 rounded-full relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]" />
+          <ScrollArea.Thumb />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
       </div>

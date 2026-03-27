@@ -23,20 +23,26 @@ No test framework is configured.
 
 **Entry flow:** `index.html` → `src/main.tsx` → `src/app/App.tsx`
 
-**App.tsx** is the root component managing UI state via `useState` and props drilling. It renders a 7-panel layout:
+**App.tsx** is the root component managing UI state via `useState` and props drilling. Key state includes `gridSize` ({rows, cols}), `layoutStyle` ('grid'|'hexagonal'|'masonry'), `spacing`, `profileStat` ('none'|'rarest'|'topPlatform'|'avgRarity'), and many visual toggles. It renders a 7-panel layout:
 - **TopBar** — Header with PSN ID search input, logo, action buttons. Progress bar only renders during active loading.
-- **LeftPanel** — Settings controls (grid size, layout, spacing, visual effects). Collapsible via chevron toggle button on right edge.
-- **CenterCanvas** — Main trophy grid display with zoom and profile header
+- **LeftPanel** — Settings controls (grid size, layout, spacing, visual effects, profile stat selector). Collapsible via chevron toggle button on right edge. Scrollable (hidden scrollbar via Radix ScrollArea).
+- **CenterCanvas** — Main trophy grid display with zoom and profile header. Contains `ProfileCard` sub-component.
 - **RightPanel** — Selected trophy detail view and tile list. Collapsible via chevron toggle button on left edge.
 - **TemplatesModal, YearInReviewCard, CompareMode** — Modal overlays
 
-Both side panels support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with CSS transitions. CenterCanvas auto-expands via `flex-1`.
+Both side panels support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with CSS transitions. Both panels are scrollable with hidden scrollbars (Radix ScrollArea). CenterCanvas auto-expands via `flex-1`.
 
 **`src/app/components/ui/`** contains ~54 shadcn/ui components (Radix UI primitives + Tailwind). The `cn()` utility in `ui/utils.ts` merges classnames via clsx + tailwind-merge.
 
 **`src/app/data/mockData.ts`** — Mock trophy and profile data used as initial state and fallback when not authenticated.
 
 **`src/app/components/figma/ImageWithFallback.tsx`** — Image loading with SVG placeholder fallback.
+
+### Grid & Mosaic System
+
+**Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button that computes `Math.ceil(Math.sqrt(trophyCount))` for optimal square grid. Grid uses fixed `128px` columns (`gridTemplateColumns: repeat(cols, 128px)`) — not `1fr` — so tiles are always perfectly aligned. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content; the grid is centered via a `flex justify-center` wrapper so it stays centered when the profile card is wider.
+
+**ProfileCard** (`CenterCanvas.tsx`): Compact, self-centering card (`self-center`) below the grid. Shows avatar + username/level + platinum count + optional configurable stat (rarest %, top platform, avg rarity, or none). The configurable stat is controlled by `profileStat` state in App.tsx and selectable via "Extra Stat" dropdown in LeftPanel (visible only when "Show Header" is on).
 
 ### Backend
 

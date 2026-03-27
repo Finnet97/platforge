@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Trophy as TrophyIcon, ZoomIn, ZoomOut, Maximize2, Gamepad2, Crown, Star, Calendar } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { usePsnData } from '../context/PsnDataContext';
+import { usePsnData, type Profile } from '../context/PsnDataContext';
 import type { Trophy } from '../data/mockData';
 // @ts-expect-error -- no type declarations for react-responsive-masonry
 import Masonry from 'react-responsive-masonry';
@@ -24,6 +24,7 @@ interface CenterCanvasProps {
   showBorders: boolean;
   showGlow: boolean;
   showProfile: boolean;
+  profileStat: 'none' | 'rarest' | 'topPlatform' | 'avgRarity';
   overlays: OverlaySettings;
   processedTrophies: Trophy[];
   bgType: 'solid' | 'gradient' | 'pattern' | 'transparent';
@@ -36,6 +37,86 @@ interface CenterCanvasProps {
   onMosaicRef?: (el: HTMLDivElement | null) => void;
 }
 
+type ProfileStatType = 'none' | 'rarest' | 'topPlatform' | 'avgRarity';
+
+function ProfileCard({ profile, profileStat, processedTrophies }: {
+  profile: Profile;
+  profileStat: ProfileStatType;
+  processedTrophies: Trophy[];
+}) {
+  const extraStat = (() => {
+    if (profileStat === 'none') return null;
+    if (profileStat === 'rarest' && profile.rarestPlatinum) {
+      return { value: `${profile.rarestPlatinum.rarity}%`, label: 'Rarest' };
+    }
+    if (profileStat === 'topPlatform' && processedTrophies.length > 0) {
+      const counts: Record<string, number> = {};
+      processedTrophies.forEach(t => { counts[t.platform] = (counts[t.platform] || 0) + 1; });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      return { value: top[0], label: 'Top Platform' };
+    }
+    if (profileStat === 'avgRarity' && processedTrophies.length > 0) {
+      const avg = processedTrophies.reduce((sum, t) => sum + t.rarity, 0) / processedTrophies.length;
+      return { value: `${avg.toFixed(1)}%`, label: 'Avg Rarity' };
+    }
+    return null;
+  })();
+
+  return (
+    <div className="mt-8 self-center bg-[#12172A] border border-[#1E2740] rounded-xl p-5 flex items-stretch gap-6">
+      {/* Avatar + Username */}
+      <div className="flex items-center gap-3">
+        <img
+          src={profile.avatar}
+          alt={profile.username}
+          className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+          style={{
+            border: '2px solid #FFD700',
+            boxShadow: '0 0 16px rgba(255, 215, 0, 0.3)'
+          }}
+        />
+        <div className="flex flex-col justify-center">
+          <p className="text-lg font-bold text-white leading-tight" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+            {profile.username}
+          </p>
+          <p className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Lv <span className="text-[#FFD700]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>{profile.psnLevel}</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="w-px bg-[#1E2740]" />
+
+      {/* Platinums */}
+      <div className="flex flex-col items-center justify-between py-1.5" style={{ minWidth: '64px' }}>
+        <TrophyIcon className="w-4 h-4 text-[#FFD700]" strokeWidth={2.5} style={{ filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.4))' }} />
+        <p className="text-lg font-bold text-white leading-none" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+          {profile.totalPlatinums}
+        </p>
+        <p className="text-[10px] text-[#8A9BB8] leading-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+          Platinums
+        </p>
+      </div>
+
+      {/* Extra stat configurable */}
+      {extraStat && (
+        <>
+          <div className="w-px bg-[#1E2740]" />
+          <div className="flex flex-col items-center justify-between py-1.5" style={{ minWidth: '64px' }}>
+            <Star className="w-4 h-4 text-[#FFD700]" strokeWidth={2.5} style={{ filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.4))' }} />
+            <p className="text-lg font-bold text-white leading-none" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+              {extraStat.value}
+            </p>
+            <p className="text-[10px] text-[#8A9BB8] leading-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {extraStat.label}
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function CenterCanvas({
   gridSize,
   layoutStyle,
@@ -44,6 +125,7 @@ export function CenterCanvas({
   showBorders,
   showGlow,
   showProfile,
+  profileStat,
   overlays,
   processedTrophies,
   bgType,
@@ -236,14 +318,16 @@ export function CenterCanvas({
 
   function renderGridLayout() {
     return (
-      <div
-        className="grid"
-        style={{
-          gridTemplateColumns: `repeat(${gridSize.cols}, 1fr)`,
-          gap: `${spacing}px`
-        }}
-      >
-        {displayTrophies.map((trophy, index) => renderTile(trophy, index))}
+      <div className="flex justify-center">
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns: `repeat(${gridSize.cols}, 128px)`,
+            gap: `${spacing}px`
+          }}
+        >
+          {displayTrophies.map((trophy, index) => renderTile(trophy, index))}
+        </div>
       </div>
     );
   }
@@ -333,7 +417,7 @@ export function CenterCanvas({
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
           <div
             ref={mosaicRef}
-            className="rounded-2xl p-8 transition-all duration-300"
+            className="inline-flex flex-col rounded-2xl p-8 transition-all duration-300"
             style={{
               transform: `scale(${zoom / 100})`,
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
@@ -358,69 +442,11 @@ export function CenterCanvas({
 
             {/* Profile Header */}
             {showProfile && (
-              <div className="mt-8 bg-[#12172A] border border-[#1E2740] rounded-xl p-6 flex items-center gap-6">
-                {/* Avatar */}
-                <div className="relative">
-                  <img
-                    src={profile.avatar}
-                    alt={profile.username}
-                    className="w-20 h-20 rounded-full object-cover"
-                    style={{
-                      border: '3px solid #FFD700',
-                      boxShadow: '0 0 20px rgba(255, 215, 0, 0.3)'
-                    }}
-                  />
-                </div>
-
-                {/* Stats */}
-                <div className="flex-1 flex items-center gap-8">
-                  <div>
-                    <p className="text-2xl font-bold text-white" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                      {profile.username}
-                    </p>
-                    <p className="text-sm text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      PSN Level <span className="text-[#FFD700]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>{profile.psnLevel}</span>
-                    </p>
-                  </div>
-
-                  <div className="h-12 w-px bg-[#1E2740]" />
-
-                  <div className="flex items-center gap-2">
-                    <TrophyIcon className="w-6 h-6 text-[#FFD700]" style={{ filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.4))' }} />
-                    <div>
-                      <p className="text-2xl font-bold text-white" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                        {profile.totalPlatinums}
-                      </p>
-                      <p className="text-xs text-[#8A9BB8]" style={{ fontFamily: 'Inter, sans-serif' }}>
-                        Platinums
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="h-12 w-px bg-[#1E2740]" />
-
-                  {profile.rarestPlatinum && (
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={profile.rarestPlatinum.imageUrl}
-                        alt="Rarest"
-                        className="w-12 h-12 rounded-lg object-cover border border-[#FFD700]/30"
-                      />
-                      <div>
-                        <p className="text-xs text-[#8A9BB8] mb-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-                          Rarest Platinum
-                        </p>
-                        <p className="text-sm font-medium text-white" style={{ fontFamily: 'Inter, sans-serif' }}>
-                          {profile.rarestPlatinum.gameTitle}
-                        </p>
-                        <p className="text-xs text-[#FFD700]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                          {profile.rarestPlatinum.rarity}% of players
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ProfileCard
+                profile={profile}
+                profileStat={profileStat}
+                processedTrophies={processedTrophies}
+              />
             )}
           </div>
         </div>
