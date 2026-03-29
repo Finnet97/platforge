@@ -62,6 +62,7 @@ function AppContent() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const mosaicRef = useRef<HTMLDivElement | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const imageCacheRef = useRef<Map<string, string>>(new Map());
 
   const mobileTileSize = useMemo(() => {
     if (!isMobile) return 128;
@@ -84,27 +85,81 @@ function AppContent() {
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
-  /** Proxies cross-origin images to data URLs for canvas capture. */
+  // Pre-cache trophy images as data URLs in the background for reliable export
+  useEffect(() => {
+    const cache = imageCacheRef.current;
+    const abort = new AbortController();
+
+    const urls = trophies.flatMap(t => {
+      const result: string[] = [t.imageUrl];
+      if (t.trophyImageUrl) result.push(t.trophyImageUrl);
+      return result;
+    }).filter(url => url && !url.startsWith('data:') && !cache.has(url));
+
+    if (urls.length === 0) return;
+
+    (async () => {
+      for (let i = 0; i < urls.length; i += 3) {
+        if (abort.signal.aborted) return;
+        const batch = urls.slice(i, i + 3);
+        await Promise.allSettled(batch.map(async (url) => {
+          try {
+            const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`, { signal: abort.signal });
+            if (!resp.ok) return;
+            const blob = await resp.blob();
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            cache.set(url, dataUrl);
+          } catch {
+            // Will retry at capture time if needed
+          }
+        }));
+        if (i + 3 < urls.length) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+    })();
+
+    return () => abort.abort();
+  }, [trophies]);
+
+  /** Proxies cross-origin images to data URLs for canvas capture. Uses pre-cached data URLs when available. */
   const proxyImages = async (el: HTMLElement) => {
     const imgs = el.querySelectorAll('img');
     const originals: { img: HTMLImageElement; src: string }[] = [];
+    const cache = imageCacheRef.current;
+
     await Promise.all(
       Array.from(imgs).map(async (img) => {
         try {
           const src = img.src;
           if (!src || src.startsWith('data:')) return;
           originals.push({ img, src });
-          const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(src)}`;
-          const resp = await fetch(proxyUrl);
-          const blob = await resp.blob();
-          const dataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
+
+          let dataUrl = cache.get(src);
+          if (!dataUrl) {
+            // Cache miss — fetch through proxy as fallback
+            const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(src)}`);
+            const blob = await resp.blob();
+            dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            cache.set(src, dataUrl);
+          }
+
+          // Set data URL and wait for the image to load
+          await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.src = dataUrl!;
+            if (img.complete) resolve();
           });
-          img.src = dataUrl;
         } catch {
-          // Keep original src if proxy fails
+          // Keep original src if all else fails
         }
       })
     );
