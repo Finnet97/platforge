@@ -40,6 +40,8 @@ export default function SupportPage() {
       className="min-h-screen relative overflow-hidden"
       style={{
         background: 'linear-gradient(145deg, #070B14 0%, #0A0E1A 30%, #0D1221 60%, #0A0E1A 100%)',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
       {/* Subtle radial glow behind content */}
@@ -58,11 +60,11 @@ export default function SupportPage() {
         }}
       />
 
-      <div className="relative z-10 max-w-2xl mx-auto px-6 py-12">
+      <div className="relative z-10 max-w-2xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
         {/* Back link */}
         <a
           href="/"
-          className="inline-flex items-center gap-2 text-sm text-[#8A9BB8] hover:text-[#FFD700] transition-colors mb-10 group"
+          className="inline-flex items-center gap-2 text-sm text-[#8A9BB8] hover:text-[#FFD700] active:text-[#FFD700] transition-colors py-2 sm:py-0 mb-6 sm:mb-10 group"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
@@ -70,15 +72,15 @@ export default function SupportPage() {
         </a>
 
         {/* Header */}
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-3 sm:gap-4 mb-4">
           <div className="relative">
             <Trophy
-              className="w-10 h-10 text-[#FFD700]"
+              className="w-8 h-8 sm:w-10 sm:h-10 text-[#FFD700]"
               style={{ filter: 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.4))' }}
             />
           </div>
           <h1
-            className="text-3xl font-bold text-[#FFD700]"
+            className="text-2xl sm:text-3xl font-bold text-[#FFD700]"
             style={{
               fontFamily: 'Orbitron, sans-serif',
               textShadow: '0 0 30px rgba(255, 215, 0, 0.15)',
@@ -90,14 +92,14 @@ export default function SupportPage() {
 
         {/* Divider */}
         <div
-          className="h-px mb-10"
+          className="h-px mb-6 sm:mb-10"
           style={{
             background: 'linear-gradient(to right, #FFD700, rgba(255, 215, 0, 0.1), transparent)',
           }}
         />
 
         {/* About */}
-        <section className="mb-12">
+        <section className="mb-8 sm:mb-12">
           <h2
             className="text-lg font-semibold text-white mb-4"
             style={{ fontFamily: 'Orbitron, sans-serif' }}
@@ -122,9 +124,9 @@ export default function SupportPage() {
         </section>
 
         {/* Donations */}
-        <section className="mb-12">
+        <section className="mb-8 sm:mb-12">
           <h2
-            className="text-lg font-semibold text-white mb-6"
+            className="text-lg font-semibold text-white mb-4 sm:mb-6"
             style={{ fontFamily: 'Orbitron, sans-serif' }}
           >
             Support Development
@@ -135,7 +137,7 @@ export default function SupportPage() {
               href={MERCADOPAGO_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="group relative bg-[#12172A] border border-[#1E2740] rounded-xl p-6 transition-all duration-300 hover:border-[#00AEEF]/50 hover:shadow-[0_0_30px_rgba(0,174,239,0.08)] block"
+              className="group relative bg-[#12172A] border border-[#1E2740] rounded-xl p-4 sm:p-6 transition-all duration-300 hover:border-[#00AEEF]/50 hover:shadow-[0_0_30px_rgba(0,174,239,0.08)] active:border-[#00AEEF]/50 active:scale-[0.98] block"
             >
               <div className="flex items-center justify-between mb-3">
                 <div
@@ -144,7 +146,7 @@ export default function SupportPage() {
                 >
                   Pesos Argentinos
                 </div>
-                <ExternalLink className="w-3.5 h-3.5 text-[#8A9BB8] opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ExternalLink className="w-3.5 h-3.5 text-[#8A9BB8] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
               </div>
               <div
                 className="text-xl font-bold text-white mb-1"
@@ -160,7 +162,7 @@ export default function SupportPage() {
               </p>
               {/* Bottom accent line */}
               <div
-                className="absolute bottom-0 left-4 right-4 h-px opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 left-4 right-4 h-px opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
                 style={{ background: 'linear-gradient(to right, transparent, #00AEEF, transparent)' }}
               />
             </a>
@@ -170,7 +172,7 @@ export default function SupportPage() {
               href={PAYPAL_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="group relative bg-[#12172A] border border-[#1E2740] rounded-xl p-6 transition-all duration-300 hover:border-[#FFD700]/50 hover:shadow-[0_0_30px_rgba(255,215,0,0.06)] block"
+              className="group relative bg-[#12172A] border border-[#1E2740] rounded-xl p-4 sm:p-6 transition-all duration-300 hover:border-[#FFD700]/50 hover:shadow-[0_0_30px_rgba(255,215,0,0.06)] active:border-[#FFD700]/50 active:scale-[0.98] block"
             >
               <div className="flex items-center justify-between mb-3">
                 <div
@@ -179,7 +181,7 @@ export default function SupportPage() {
                 >
                   US Dollars
                 </div>
-                <ExternalLink className="w-3.5 h-3.5 text-[#8A9BB8] opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ExternalLink className="w-3.5 h-3.5 text-[#8A9BB8] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
               </div>
               <div
                 className="text-xl font-bold text-white mb-1"
@@ -195,7 +197,7 @@ export default function SupportPage() {
               </p>
               {/* Bottom accent line */}
               <div
-                className="absolute bottom-0 left-4 right-4 h-px opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 left-4 right-4 h-px opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
                 style={{ background: 'linear-gradient(to right, transparent, #FFD700, transparent)' }}
               />
             </a>
@@ -203,9 +205,9 @@ export default function SupportPage() {
         </section>
 
         {/* Social Links */}
-        <section className="mb-16">
+        <section className="mb-10 sm:mb-16">
           <h2
-            className="text-lg font-semibold text-white mb-6"
+            className="text-lg font-semibold text-white mb-4 sm:mb-6"
             style={{ fontFamily: 'Orbitron, sans-serif' }}
           >
             Connect
@@ -215,7 +217,7 @@ export default function SupportPage() {
               href={LINKS.github}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#FFD700] hover:text-[#FFD700] text-[#8A9BB8] transition-all duration-300"
+              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#FFD700] hover:text-[#FFD700] active:border-[#FFD700] active:text-[#FFD700] active:scale-95 text-[#8A9BB8] transition-all duration-300"
               title="GitHub"
             >
               <GithubIcon className="w-5 h-5" />
@@ -224,7 +226,7 @@ export default function SupportPage() {
               href={LINKS.linkedin}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#0A66C2] hover:text-[#0A66C2] text-[#8A9BB8] transition-all duration-300"
+              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#0A66C2] hover:text-[#0A66C2] active:border-[#0A66C2] active:text-[#0A66C2] active:scale-95 text-[#8A9BB8] transition-all duration-300"
               title="LinkedIn"
             >
               <LinkedInIcon className="w-5 h-5" />
@@ -233,14 +235,14 @@ export default function SupportPage() {
               href={LINKS.instagram}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#E4405F] hover:text-[#E4405F] text-[#8A9BB8] transition-all duration-300"
+              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#E4405F] hover:text-[#E4405F] active:border-[#E4405F] active:text-[#E4405F] active:scale-95 text-[#8A9BB8] transition-all duration-300"
               title="Instagram"
             >
               <InstagramIcon className="w-5 h-5" />
             </a>
             <a
               href={`mailto:${CONTACT_EMAIL}`}
-              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#FFD700] hover:text-[#FFD700] text-[#8A9BB8] transition-all duration-300"
+              className="w-12 h-12 flex items-center justify-center bg-[#12172A] border border-[#1E2740] rounded-xl hover:border-[#FFD700] hover:text-[#FFD700] active:border-[#FFD700] active:text-[#FFD700] active:scale-95 text-[#8A9BB8] transition-all duration-300"
               title={CONTACT_EMAIL}
             >
               <Mail className="w-5 h-5" />
@@ -250,7 +252,7 @@ export default function SupportPage() {
             className="mt-3 text-xs text-[#8A9BB8]"
             style={{ fontFamily: 'Inter, sans-serif' }}
           >
-            <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-[#FFD700] transition-colors">
+            <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-[#FFD700] active:text-[#FFD700] transition-colors">
               {CONTACT_EMAIL}
             </a>
           </p>

@@ -34,8 +34,8 @@ No test framework is configured.
 **Mobile layout (<768px):** Canvas-first with bottom drawers — TopBar (2 rows) + CenterCanvas (full width) + drawers
 - **TopBar (mobile)** — Row 1: logo + share/settings/overflow menu icons. Row 2: full-width search input with GO button. Overflow menu (MoreVertical) contains Export, Support, and PSN Auth.
 - **CenterCanvas (mobile)** — Responsive tile sizing (`tileSize` computed from viewport width). No tooltips, no hover effects, no zoom controls. Tap on tile opens details drawer.
-- **MobileSettingsDrawer** — Bottom drawer (vaul) wrapping `SettingsContent`. Opens via ⚙️ button. Snap points: 50%, 90%.
-- **MobileDetailsDrawer** — Bottom drawer (vaul) wrapping `TrophyDetailContent` + `MosaicTileList`. Opens on tile tap. Snap points: 40% (preview), 85% (full + reorder).
+- **MobileSettingsDrawer** — Bottom drawer (vaul) wrapping `SettingsContent`. Opens via ⚙️ button. Fixed height at 85vh (no snap points — opens fully, swipe down to close).
+- **MobileDetailsDrawer** — Bottom drawer (vaul) wrapping `TrophyDetailContent` + `MosaicTileList`. Opens on tile tap. Fixed height at 85vh (no snap points — opens fully, swipe down to close).
 
 **Modals:** `TemplatesModal`, `YearInReviewCard`, `CompareMode`, `AuthSettingsModal` are lazy-loaded via `React.lazy()` (currently hidden except AuthSettingsModal, logic preserved).
 
@@ -49,7 +49,7 @@ Uses React Router v7 (`react-router`). Configured in `src/main.tsx` with `Browse
 
 ### Support Page
 
-Standalone page at `/support` with project description, donation links (MercadoPago for ARS, PayPal for USD), social links (GitHub, LinkedIn, Instagram), and contact email. Opens in new tab via Support button in TopBar. Styled with the same dark theme as the main app (no shared layout wrapper — self-contained).
+Standalone page at `/support` with project description, donation links (MercadoPago for ARS, PayPal for USD), social links (GitHub, LinkedIn, Instagram), and contact email. Opens in new tab via Support button in TopBar. Styled with the same dark theme as the main app (no shared layout wrapper — self-contained). Mobile-optimized with responsive spacing (`px-4 py-6` → `sm:px-6 sm:py-12`), scaled typography, safe area insets for notched phones (`viewport-fit=cover` + `env(safe-area-inset-*)`), and `active:` states replacing hover for touch feedback on donation cards and social icons.
 
 ### Custom Sort / Drag-to-Reorder
 
@@ -69,7 +69,9 @@ Standalone page at `/support` with project description, donation links (MercadoP
 
 **Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button with best-fit algorithm that finds the most compact rectangular grid (not necessarily square) for the trophy count, preferring squarish shapes. Grid uses fixed-size columns (`gridTemplateColumns: repeat(cols, ${tileSize}px)`) — not `1fr` — so tiles are always perfectly aligned. Desktop tile size is 128px; on mobile, tile size is computed responsively: `Math.floor((viewportWidth - padding - gaps) / cols)` with a 48px minimum. When the last row has fewer tiles than columns, it renders as a centered flexbox row instead of left-aligned grid cells. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content.
 
-**Image capture:** `captureMosaicBlob()` in App.tsx is a reusable function that captures the mosaic as a PNG Blob (handles cross-origin image proxying, scale reset, and source restoration). Used by both Export (download) and Share (Web Share API / clipboard). A simple toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for clipboard copies.
+**Image capture:** `captureMosaicBlob()` in App.tsx captures the mosaic as a PNG Blob (handles cross-origin image proxying via `/api/image-proxy`, scale reset, and source restoration). Used by both Export (download) and Share (Web Share API / clipboard). On mobile, `getExportOptions()` applies CSS `transform: scale(128/mobileTileSize)` to the `html-to-image` clone so the exported image matches desktop quality (128px tiles) without re-rendering the DOM. Border-radius is compensated (`16/ratio px`) so it visually matches desktop's `rounded-2xl` after scaling. `proxyImages()` is a shared helper used by both PNG and JPEG export paths. A simple toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for clipboard copies.
+
+**Tile overlay scaling:** Badge overlays (order number, rarity, platform icon, date, milestones, rarest badge) use a proportional scaling system (`ov` object in CenterCanvas.tsx) based on `effectiveTileSize / 128`. All overlay sizes, positions, fonts, and icons scale linearly with tile size. Overlays use `bg-black/75` (solid) instead of `backdrop-blur-sm` because `html-to-image` renders `backdrop-filter` incorrectly as visual artifacts in exported images.
 
 **ProfileCard** (`CenterCanvas.tsx`): Compact, self-centering card (`self-center`) below the grid. Shows avatar + username/level + platinum count + optional configurable stat (rarest %, top platform, avg rarity, or none). The configurable stat is controlled by `profileStat` state in App.tsx and selectable via "Extra Stat" dropdown in LeftPanel (visible only when "Show Header" is on).
 
@@ -215,3 +217,5 @@ See `.env.example` for setup instructions.
 - Mock data is used as initial/fallback state; it's displayed when no profile is loaded
 - `SERVICE_NPSSO` refresh token chain can break after extended downtime — requires manual renewal
 - Export (`html-to-image`) requires the image proxy (`/api/image-proxy`) to convert cross-origin images to data URLs before canvas capture
+- `html-to-image` does not render `backdrop-filter: blur()` correctly — tile overlays use solid `bg-black/75` instead
+- Mobile export uses CSS `transform: scale()` on the `html-to-image` clone (not DOM re-rendering) to produce desktop-equivalent images; `getExportOptions()` in App.tsx handles the scaling math

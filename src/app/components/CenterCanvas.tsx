@@ -221,6 +221,22 @@ export function CenterCanvas({
 
   const tileRadius = `${borderRadius}%`;
 
+  // Scale factor for overlay badges relative to the 128px desktop reference
+  const scale = effectiveTileSize / 128;
+  const ov = {
+    inset: Math.max(2, Math.round(8 * scale)),        // top-2/bottom-2 equivalent
+    padX: Math.max(3, Math.round(8 * scale)),          // px-2 equivalent
+    padY: Math.max(1, Math.round(4 * scale)),          // py-1 equivalent
+    fontSize: Math.max(7, Math.round(12 * scale)),     // text-xs equivalent
+    fontSizeSm: Math.max(6, Math.round(9 * scale)),    // text-[9px]/text-[10px] equivalent
+    badgeSize: Math.max(14, Math.round(28 * scale)),   // w-7 h-7 equivalent
+    badgeSizeSm: Math.max(12, Math.round(24 * scale)), // w-6 h-6 equivalent
+    iconSize: Math.max(8, Math.round(16 * scale)),     // w-4 h-4 equivalent
+    iconSizeSm: Math.max(7, Math.round(14 * scale)),   // w-3.5 h-3.5 equivalent
+    calIcon: Math.max(6, Math.round(10 * scale)),      // w-2.5 h-2.5 equivalent
+    stackOffset: Math.max(16, Math.round(32 * scale)), // top-8 equivalent (for stacked badges)
+  };
+
   function renderTile(trophy: Trophy, index: number, heightOverride?: number) {
     const tileDiv = (
       <div
@@ -275,8 +291,8 @@ export function CenterCanvas({
         {/* Order Number Badge */}
         {overlays.showOrder && (
           <div
-            className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-[#FFD700] border border-[#FFD700]/30"
-            style={{ fontFamily: 'Rajdhani, sans-serif' }}
+            className="absolute bg-black/75 rounded-full text-[#FFD700] border border-[#FFD700]/30"
+            style={{ top: ov.inset, left: ov.inset, padding: `${ov.padY}px ${ov.padX}px`, fontSize: ov.fontSize, fontFamily: 'Rajdhani, sans-serif', lineHeight: 1.2 }}
           >
             #{trophy.order}
           </div>
@@ -285,8 +301,8 @@ export function CenterCanvas({
         {/* Rarity Badge */}
         {overlays.showRarity && (
           <div
-            className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-[#FFD700] border border-[#FFD700]/30"
-            style={{ fontFamily: 'Rajdhani, sans-serif' }}
+            className="absolute bg-black/75 rounded-full text-[#FFD700] border border-[#FFD700]/30"
+            style={{ top: ov.inset, right: ov.inset, padding: `${ov.padY}px ${ov.padX}px`, fontSize: ov.fontSize, fontFamily: 'Rajdhani, sans-serif', lineHeight: 1.2 }}
           >
             {trophy.rarity}%
           </div>
@@ -295,18 +311,19 @@ export function CenterCanvas({
         {/* Platform Badge */}
         {overlays.showPlatformIcon && (
           <div
-            className="absolute bottom-2 right-2 w-7 h-7 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center border border-[#FFD700]/30"
+            className="absolute bg-black/75 rounded-full flex items-center justify-center border border-[#FFD700]/30"
+            style={{ bottom: ov.inset, right: ov.inset, width: ov.badgeSize, height: ov.badgeSize }}
           >
-            <Gamepad2 className="w-4 h-4 text-[#FFD700]" />
+            <Gamepad2 className="text-[#FFD700]" style={{ width: ov.iconSize, height: ov.iconSize }} />
           </div>
         )}
 
         {/* Game Name Overlay */}
         {overlays.showGameName && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-2"
-            style={{ borderRadius: `0 0 ${tileRadius} ${tileRadius}` }}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent"
+            style={{ borderRadius: `0 0 ${tileRadius} ${tileRadius}`, padding: `${ov.padY + 2}px ${ov.padX}px` }}
           >
-            <p className="text-[10px] text-white truncate font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <p className="text-white truncate font-medium" style={{ fontSize: ov.fontSizeSm + 1, fontFamily: 'Inter, sans-serif', lineHeight: 1.2 }}>
               {trophy.gameTitle}
             </p>
           </div>
@@ -315,31 +332,31 @@ export function CenterCanvas({
         {/* Date Overlay */}
         {overlays.showDate && (
           <div
-            className={`absolute ${overlays.showOrder ? 'top-8' : 'top-2'} left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full text-[9px] text-[#8A9BB8] border border-[#1E2740] flex items-center gap-1`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
+            className="absolute bg-black/75 rounded-full text-[#8A9BB8] border border-[#1E2740] flex items-center"
+            style={{ top: overlays.showOrder ? ov.stackOffset : ov.inset, left: ov.inset, padding: `${ov.padY}px ${ov.padX}px`, fontSize: ov.fontSizeSm, fontFamily: 'Inter, sans-serif', lineHeight: 1.2, gap: Math.round(4 * scale) }}
           >
-            <Calendar className="w-2.5 h-2.5" />
+            <Calendar style={{ width: ov.calIcon, height: ov.calIcon }} />
             {trophy.dateEarned.split(',')[0]}
           </div>
         )}
 
         {/* Milestone Badge */}
         {overlays.showMilestones && (trophy.order % 25 === 0 || trophy.order % 10 === 0) && (
-          <div className={`absolute ${overlays.showRarity ? 'top-8' : 'top-2'} right-2 w-6 h-6 rounded-full flex items-center justify-center ${
+          <div className={`absolute rounded-full flex items-center justify-center ${
             trophy.order % 25 === 0
               ? 'bg-[#FFD700] text-black'
-              : 'bg-black/60 backdrop-blur-sm text-[#FFD700] border border-[#FFD700]/30'
-          }`}>
-            <Star className="w-3.5 h-3.5" />
+              : 'bg-black/75 text-[#FFD700] border border-[#FFD700]/30'
+          }`} style={{ top: overlays.showRarity ? ov.stackOffset : ov.inset, right: ov.inset, width: ov.badgeSizeSm, height: ov.badgeSizeSm }}>
+            <Star style={{ width: ov.iconSizeSm, height: ov.iconSizeSm }} />
           </div>
         )}
 
         {/* Rarest Platinum Badge */}
         {overlays.showRarestBadge && profile.rarestPlatinum && trophy.id === profile.rarestPlatinum.id && (
-          <div className="absolute -top-1 -right-1 w-7 h-7 bg-[#FFD700] rounded-full flex items-center justify-center shadow-lg z-10"
-            style={{ boxShadow: '0 0 12px rgba(255, 215, 0, 0.6)' }}
+          <div className="absolute bg-[#FFD700] rounded-full flex items-center justify-center shadow-lg z-10"
+            style={{ top: -Math.round(4 * scale), right: -Math.round(4 * scale), width: ov.badgeSize, height: ov.badgeSize, boxShadow: '0 0 12px rgba(255, 215, 0, 0.6)' }}
           >
-            <Crown className="w-4 h-4 text-black" />
+            <Crown className="text-black" style={{ width: ov.iconSize, height: ov.iconSize }} />
           </div>
         )}
 

@@ -84,14 +84,8 @@ function AppContent() {
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
-  /** Captures the mosaic as a PNG Blob, handling cross-origin images via proxy. */
-  const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
-    const el = mosaicRef.current;
-    if (!el) return null;
-    const originalTransform = el.style.transform;
-    el.style.transform = 'scale(1)';
-
-    // Convert cross-origin images to data URLs via proxy
+  /** Proxies cross-origin images to data URLs for canvas capture. */
+  const proxyImages = async (el: HTMLElement) => {
     const imgs = el.querySelectorAll('img');
     const originals: { img: HTMLImageElement; src: string }[] = [];
     await Promise.all(
@@ -114,16 +108,45 @@ function AppContent() {
         }
       })
     );
+    return originals;
+  };
+
+  /** Returns capture options that scale mobile mosaic to desktop-equivalent size. */
+  const getExportOptions = (el: HTMLElement) => {
+    if (!isMobile) return {};
+    const ratio = 128 / mobileTileSize;
+    return {
+      width: Math.ceil(el.scrollWidth * ratio),
+      height: Math.ceil(el.scrollHeight * ratio),
+      style: {
+        transform: `scale(${ratio})`,
+        transformOrigin: 'top left',
+        // Compensate border-radius so it visually matches desktop's 16px after scaling
+        borderRadius: `${16 / ratio}px`,
+        width: el.scrollWidth + 'px',
+      },
+    };
+  };
+
+  /** Captures the mosaic as a PNG Blob, handling cross-origin images via proxy. */
+  const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
+    const el = mosaicRef.current;
+    if (!el) return null;
+
+    const originalTransform = el.style.transform;
+    el.style.transform = 'scale(1)';
+
+    const originals = await proxyImages(el);
 
     try {
-      const dataUrl = await toPng(el, { pixelRatio: 2 });
+      const dataUrl = await toPng(el, { pixelRatio: 2, ...getExportOptions(el) });
       const res = await fetch(dataUrl);
       return await res.blob();
     } finally {
       el.style.transform = originalTransform;
       originals.forEach(({ img, src }) => { img.src = src; });
     }
-  }, []);
+  }, [isMobile, mobileTileSize]);
 
   const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
     const el = mosaicRef.current;
@@ -143,30 +166,9 @@ function AppContent() {
       // JPEG path: capture directly since captureMosaicBlob is PNG-only
       const originalTransform = el.style.transform;
       el.style.transform = 'scale(1)';
-      const imgs = el.querySelectorAll('img');
-      const originals: { img: HTMLImageElement; src: string }[] = [];
-      await Promise.all(
-        Array.from(imgs).map(async (img) => {
-          try {
-            const src = img.src;
-            if (!src || src.startsWith('data:')) return;
-            originals.push({ img, src });
-            const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(src)}`;
-            const resp = await fetch(proxyUrl);
-            const blob = await resp.blob();
-            const dataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-            img.src = dataUrl;
-          } catch {
-            // Keep original src if proxy fails
-          }
-        })
-      );
+      const originals = await proxyImages(el);
       try {
-        const dataUrl = await toJpeg(el, { quality: 0.95 });
+        const dataUrl = await toJpeg(el, { quality: 0.95, ...getExportOptions(el) });
         const link = document.createElement('a');
         link.download = `platforge-${Date.now()}.jpeg`;
         link.href = dataUrl;
@@ -176,7 +178,7 @@ function AppContent() {
         originals.forEach(({ img, src }) => { img.src = src; });
       }
     }
-  }, [fileType, captureMosaicBlob]);
+  }, [fileType, isMobile, mobileTileSize, captureMosaicBlob]);
 
   const handleShare = useCallback(async () => {
     const blob = await captureMosaicBlob();
