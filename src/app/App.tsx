@@ -153,69 +153,86 @@ function AppContent() {
     if (!el) return;
     const exportFormat = format || fileType;
 
-    if (exportFormat === 'png') {
+    try {
+      if (exportFormat === 'png') {
+        const blob = await captureMosaicBlob();
+        if (!blob) {
+          showToast('Export failed — please try again');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `platforge-${Date.now()}.png`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // JPEG path: capture directly since captureMosaicBlob is PNG-only
+        const originalTransform = el.style.transform;
+        el.style.transform = 'scale(1)';
+        const originals = await proxyImages(el);
+        try {
+          const dataUrl = await toJpeg(el, { quality: 0.95, ...getExportOptions(el) });
+          const link = document.createElement('a');
+          link.download = `platforge-${Date.now()}.jpeg`;
+          link.href = dataUrl;
+          link.click();
+        } finally {
+          el.style.transform = originalTransform;
+          originals.forEach(({ img, src }) => { img.src = src; });
+        }
+      }
+      showToast('Image downloaded');
+    } catch (err) {
+      console.warn('[export] Failed:', err);
+      showToast('Export failed — please try again');
+    }
+  }, [fileType, isMobile, mobileTileSize, captureMosaicBlob, showToast]);
+
+  const handleShare = useCallback(async () => {
+    try {
       const blob = await captureMosaicBlob();
-      if (!blob) return;
+      if (!blob) {
+        showToast('Share failed — please try again');
+        return;
+      }
+
+      const file = new File([blob], `platforge-${Date.now()}.png`, { type: 'image/png' });
+
+      // Try native Web Share API with file support
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'PlatForge' });
+          return;
+        } catch (err) {
+          // User cancelled share — not an error
+          if (err instanceof Error && err.name === 'AbortError') return;
+        }
+      }
+
+      // Fallback: copy image to clipboard
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ]);
+        showToast('Image copied to clipboard');
+        return;
+      } catch (err) {
+        console.warn('[share] Clipboard write failed:', err);
+      }
+
+      // Final fallback: download
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = `platforge-${Date.now()}.png`;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
-    } else {
-      // JPEG path: capture directly since captureMosaicBlob is PNG-only
-      const originalTransform = el.style.transform;
-      el.style.transform = 'scale(1)';
-      const originals = await proxyImages(el);
-      try {
-        const dataUrl = await toJpeg(el, { quality: 0.95, ...getExportOptions(el) });
-        const link = document.createElement('a');
-        link.download = `platforge-${Date.now()}.jpeg`;
-        link.href = dataUrl;
-        link.click();
-      } finally {
-        el.style.transform = originalTransform;
-        originals.forEach(({ img, src }) => { img.src = src; });
-      }
+      showToast('Image downloaded');
+    } catch (err) {
+      console.warn('[share] Failed:', err);
+      showToast('Share failed — please try again');
     }
-  }, [fileType, isMobile, mobileTileSize, captureMosaicBlob]);
-
-  const handleShare = useCallback(async () => {
-    const blob = await captureMosaicBlob();
-    if (!blob) return;
-
-    const file = new File([blob], `platforge-${Date.now()}.png`, { type: 'image/png' });
-
-    // Try native Web Share API with file support
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: 'PlatForge' });
-        return;
-      } catch (err) {
-        // User cancelled share — not an error
-        if (err instanceof Error && err.name === 'AbortError') return;
-      }
-    }
-
-    // Fallback: copy image to clipboard
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob }),
-      ]);
-      showToast('Imagen copiada al portapapeles');
-      return;
-    } catch {
-      // Clipboard API not available
-    }
-
-    // Final fallback: download
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `platforge-${Date.now()}.png`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
-    showToast('Imagen descargada');
   }, [captureMosaicBlob, showToast]);
 
   const handleApplyTemplate = useCallback((settings: TemplateSettings) => {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from "react";
 import type { Trophy } from "../data/mockData";
 import { mockTrophies, mockProfile } from "../data/mockData";
 import { fetchJson, postJson } from "../services/api";
@@ -71,6 +71,7 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
   const abortRef = useRef<AbortController | null>(null);
 
   const canSearch = isAuthenticated || serviceAvailable;
+  const hasAutoLoaded = useRef(false);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -215,6 +216,14 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
+
+  // Auto-load default profile on startup when service is available
+  useEffect(() => {
+    if (canSearch && !hasAutoLoaded.current) {
+      hasAutoLoaded.current = true;
+      loadProfile("Chipo97_");
+    }
+  }, [canSearch, loadProfile]);
 
   return (
     <PsnDataContext.Provider

@@ -12,6 +12,7 @@ PlatForge is a PlayStation trophy gallery visualizer. It connects to the real PS
 - `npm run dev:client` — Start only the Vite dev server
 - `npm run dev:server` — Start only the Express backend (via `tsx watch`)
 - `npm run build` — Production build (Vite)
+- `npm start` — Start production server (serves frontend + API from same process)
 
 No test framework is configured.
 
@@ -21,7 +22,7 @@ No test framework is configured.
 
 ### Frontend
 
-**Entry flow:** `index.html` → `src/main.tsx` (BrowserRouter + Routes) → `src/app/App.tsx` (main app at `/`) or `src/app/pages/SupportPage.tsx` (at `/support`)
+**Entry flow:** `index.html` → `src/main.tsx` (ErrorBoundary + BrowserRouter + Routes) → `src/app/App.tsx` (main app at `/`) or `src/app/pages/SupportPage.tsx` (at `/support`)
 
 **App.tsx** is the root component managing UI state via `useState` and props drilling. Key state includes `gridSize` ({rows, cols}), `spacing`, `sortBy` ('date'|'alpha'|'rarity'|'platform'|'speed'|'custom'), `customOrder` (number[] of trophy IDs for manual ordering), `profileStat` ('none'|'rarest'|'topPlatform'|'avgRarity'), and many visual toggles. It uses `useIsMobile()` (768px breakpoint) to conditionally render **desktop** or **mobile** layouts:
 
@@ -34,10 +35,12 @@ No test framework is configured.
 **Mobile layout (<768px):** Canvas-first with bottom drawers — TopBar (2 rows) + CenterCanvas (full width) + drawers
 - **TopBar (mobile)** — Row 1: logo + share/settings/overflow menu icons. Row 2: full-width search input with GO button. Overflow menu (MoreVertical) contains Export, Support, and PSN Auth.
 - **CenterCanvas (mobile)** — Responsive tile sizing (`tileSize` computed from viewport width). No tooltips, no hover effects, no zoom controls. Tap on tile opens details drawer.
-- **MobileSettingsDrawer** — Bottom drawer (vaul) wrapping `SettingsContent`. Opens via ⚙️ button. Fixed height at 85vh (no snap points — opens fully, swipe down to close).
+- **MobileSettingsDrawer** — Bottom drawer (vaul) wrapping `SettingsContent`. Opens via settings button. Fixed height at 85vh (no snap points — opens fully, swipe down to close).
 - **MobileDetailsDrawer** — Bottom drawer (vaul) wrapping `TrophyDetailContent` + `MosaicTileList`. Opens on tile tap. Fixed height at 85vh (no snap points — opens fully, swipe down to close).
 
 **Modals:** `TemplatesModal`, `YearInReviewCard`, `CompareMode`, `AuthSettingsModal` are lazy-loaded via `React.lazy()` (currently hidden except AuthSettingsModal, logic preserved).
+
+**ErrorBoundary:** `src/app/components/ErrorBoundary.tsx` wraps the entire app in `src/main.tsx`. Catches unhandled render errors and shows a dark-themed fallback with a Reload button.
 
 Both side panels (desktop) support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with `transition-all duration-300 ease-in-out`. LeftPanel uses Radix ScrollArea; RightPanel uses native overflow scroll with `.scrollbar-hide`. CenterCanvas auto-expands via `flex-1`.
 
@@ -61,7 +64,7 @@ Standalone page at `/support` with project description, donation links (MercadoP
 
 **`src/app/components/ui/`** contains ~54 shadcn/ui components (Radix UI primitives + Tailwind). The `cn()` utility in `ui/utils.ts` merges classnames via clsx + tailwind-merge.
 
-**`src/app/data/mockData.ts`** — Mock trophy and profile data used as initial state and fallback when not authenticated.
+**`src/app/data/mockData.ts`** — Mock trophy and profile data used as initial state and fallback when service is unavailable.
 
 **`src/app/components/figma/ImageWithFallback.tsx`** — Image loading with SVG placeholder fallback.
 
@@ -69,7 +72,7 @@ Standalone page at `/support` with project description, donation links (MercadoP
 
 **Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button with best-fit algorithm that finds the most compact rectangular grid (not necessarily square) for the trophy count, preferring squarish shapes. Grid uses fixed-size columns (`gridTemplateColumns: repeat(cols, ${tileSize}px)`) — not `1fr` — so tiles are always perfectly aligned. Desktop tile size is 128px; on mobile, tile size is computed responsively: `Math.floor((viewportWidth - padding - gaps) / cols)` with a 48px minimum. When the last row has fewer tiles than columns, it renders as a centered flexbox row instead of left-aligned grid cells. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content.
 
-**Image capture:** `captureMosaicBlob()` in App.tsx captures the mosaic as a PNG Blob (handles cross-origin image proxying via `/api/image-proxy`, scale reset, and source restoration). Used by both Export (download) and Share (Web Share API / clipboard). On mobile, `getExportOptions()` applies CSS `transform: scale(128/mobileTileSize)` to the `html-to-image` clone so the exported image matches desktop quality (128px tiles) without re-rendering the DOM. Border-radius is compensated (`16/ratio px`) so it visually matches desktop's `rounded-2xl` after scaling. `proxyImages()` is a shared helper used by both PNG and JPEG export paths. A simple toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for clipboard copies.
+**Image capture:** `captureMosaicBlob()` in App.tsx captures the mosaic as a PNG Blob (handles cross-origin image proxying via `/api/image-proxy`, scale reset, and source restoration). Used by both Export (download) and Share (Web Share API / clipboard). On mobile, `getExportOptions()` applies CSS `transform: scale(128/mobileTileSize)` to the `html-to-image` clone so the exported image matches desktop quality (128px tiles) without re-rendering the DOM. Border-radius is compensated (`16/ratio px`) so it visually matches desktop's `rounded-2xl` after scaling. `proxyImages()` is a shared helper used by both PNG and JPEG export paths. A toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for export/share results including errors.
 
 **Tile overlay scaling:** Badge overlays (order number, rarity, platform icon, date, milestones, rarest badge) use a proportional scaling system (`ov` object in CenterCanvas.tsx) based on `effectiveTileSize / 128`. All overlay sizes, positions, fonts, and icons scale linearly with tile size. Overlays use `bg-black/75` (solid) instead of `backdrop-blur-sm` because `html-to-image` renders `backdrop-filter` incorrectly as visual artifacts in exported images.
 
@@ -77,9 +80,14 @@ Standalone page at `/support` with project description, donation links (MercadoP
 
 ### Backend
 
-**Entry point:** `server/index.ts` — Express app on port 3001 (configurable via `PORT` env var)
+**Entry point:** `server/index.ts` — Express app on port 3001 (configurable via `PORT` env var). In production (`NODE_ENV=production`), serves the Vite-built frontend from `dist/` with SPA fallback for client-side routing.
 
-**Middleware:** `cors` (allows `localhost:5173`), `express.json()`
+**Middleware:** `cors` (dev only, configurable via `CORS_ORIGIN` env var), `express.json()`, `express-rate-limit` (100 req/15min general, 10 req/15min on auth)
+
+**Security:**
+- Image proxy (`/api/image-proxy`) validates URLs against a whitelist of PSN CDN domains (HTTPS only)
+- Rate limiting on all API endpoints via `express-rate-limit`
+- Global error handler catches unhandled errors and returns generic JSON response
 
 **File structure:**
 - `server/routes/auth.ts` — Authentication endpoints
@@ -91,9 +99,10 @@ Standalone page at `/support` with project description, donation links (MercadoP
 
 ### Frontend ↔ Backend Communication
 
-- Vite dev server proxies `/api` → `http://localhost:3001` (configured in `vite.config.ts`)
+- **Dev:** Vite dev server proxies `/api` → `http://localhost:3001` (configured in `vite.config.ts`)
+- **Production:** Express serves both API and frontend from the same origin (no CORS needed)
 - `src/app/services/api.ts` exports `fetchJson<T>(path)` and `postJson<T>(path, body)` — all paths start with `/api`
-- `src/app/context/PsnDataContext.tsx` is the React context that manages all PSN state and exposes: `submitNpsso`, `loadProfile`, `logout`, `checkAuth`, `canSearch`, `serviceAvailable`
+- `src/app/context/PsnDataContext.tsx` is the React context that manages all PSN state and exposes: `submitNpsso`, `loadProfile`, `logout`, `checkAuth`, `canSearch`, `serviceAvailable`. Auto-loads the default profile ("Chipo97_") on startup when the service is available.
 
 ## API Endpoints
 
@@ -106,7 +115,7 @@ Standalone page at `/support` with project description, donation links (MercadoP
 | POST | `/api/auth/logout` | Clear user auth tokens |
 | GET | `/api/profile/:username` | Search user, fetch profile + platinum titles |
 | GET | `/api/trophies/:accountId/:npCommunicationId/rarity` | Fetch platinum rarity for a specific title |
-| GET | `/api/image-proxy?url=...` | Proxy external images to bypass CORS for export |
+| GET | `/api/image-proxy?url=...` | Proxy external images (PSN CDN domains only) to bypass CORS for export |
 
 Legacy endpoints (`/api/auth/login`, `/api/auth/verify-2fa`, `/api/auth/cancel-2fa`) exist but throw errors — Sony's Akamai anti-bot blocks automated browser login.
 
@@ -180,8 +189,18 @@ Legacy endpoints (`/api/auth/login`, `/api/auth/verify-2fa`, `/api/auth/cancel-2
 |----------|----------|---------|
 | `SERVICE_NPSSO` | No (but needed for public mode) | PSN service account NPSSO token — enables search without user auth |
 | `PORT` | No (default: 3001) | Server port |
+| `NODE_ENV` | No | Set to `production` for production mode (serves frontend, disables CORS) |
+| `CORS_ORIGIN` | No | Comma-separated allowed origins for CORS (dev only, default: `http://localhost:5173`) |
 
-See `.env.example` for setup instructions.
+## Deployment
+
+**Hosted on Railway** as a single service (frontend + backend on same origin).
+
+- `railway.json` configures build (`vite build`) and start (`npm start` → `tsx server/index.ts`)
+- In production, Express serves the Vite-built `dist/` folder as static files with SPA fallback
+- No CORS configuration needed (same origin)
+- Health check endpoint: `/api/health`
+- Set `SERVICE_NPSSO` and `NODE_ENV=production` in Railway environment variables
 
 ## Responsive Design
 
@@ -214,8 +233,9 @@ See `.env.example` for setup instructions.
 - No persistent storage — auth tokens and user data exist only in server memory
 - Service account can only access public trophy data — Sony's API enforces privacy settings server-side
 - `timeToPlatinum` field is always `"--"` (placeholder) — PSN API doesn't provide this data
-- Mock data is used as initial/fallback state; it's displayed when no profile is loaded
+- Mock data is used as initial/fallback state; auto-loads "Chipo97_" profile when service is available
 - `SERVICE_NPSSO` refresh token chain can break after extended downtime — requires manual renewal
 - Export (`html-to-image`) requires the image proxy (`/api/image-proxy`) to convert cross-origin images to data URLs before canvas capture
 - `html-to-image` does not render `backdrop-filter: blur()` correctly — tile overlays use solid `bg-black/75` instead
 - Mobile export uses CSS `transform: scale()` on the `html-to-image` clone (not DOM re-rendering) to produce desktop-equivalent images; `getExportOptions()` in App.tsx handles the scaling math
+- Express 5 uses `path-to-regexp` v8 — wildcard routes require named params syntax (`{*splat}` instead of `*`)
