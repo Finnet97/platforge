@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Download, Share2, Trophy, Settings, Loader2, MoreVertical } from 'lucide-react';
+import { Search, Download, Share2, Trophy, Settings, Loader2, MoreVertical, Heart } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Progress from '@radix-ui/react-progress';
 import { usePsnData } from '../context/PsnDataContext';
@@ -101,6 +101,15 @@ export function TopBar({ onShowAuth, onExport, onShare, isMobile, onOpenSettings
                   >
                     <Download className="w-3.5 h-3.5" />
                     Export as JPEG
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Separator className="my-1 h-px bg-[#1E2740]" />
+                  <DropdownMenu.Item
+                    className="px-3 py-2 text-sm text-[#8A9BB8] rounded hover:bg-[#1E2740] cursor-pointer outline-none flex items-center gap-2"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                    onSelect={() => window.open('/support', '_blank')}
+                  >
+                    <Heart className="w-3.5 h-3.5" />
+                    Support
                   </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-[#1E2740]" />
                   <DropdownMenu.Item
@@ -241,6 +250,17 @@ export function TopBar({ onShowAuth, onExport, onShare, isMobile, onOpenSettings
           >
             <Settings className="w-3.5 h-3.5" />
             {isAuthenticated ? 'Connected' : 'PSN'}
+          </button>
+
+          {/* Support */}
+          <button
+            onClick={() => window.open('/support', '_blank')}
+            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-[#8A9BB8] text-sm rounded-lg hover:border-[#FFD700] hover:text-[#FFD700] transition-colors flex items-center gap-1.5"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+            title="Support PlatForge"
+          >
+            <Heart className="w-3.5 h-3.5" />
+            Support
           </button>
 
           {/* Templates, Year Review, and Compare buttons hidden for now */}

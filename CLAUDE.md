@@ -21,18 +21,18 @@ No test framework is configured.
 
 ### Frontend
 
-**Entry flow:** `index.html` → `src/main.tsx` → `src/app/App.tsx`
+**Entry flow:** `index.html` → `src/main.tsx` (BrowserRouter + Routes) → `src/app/App.tsx` (main app at `/`) or `src/app/pages/SupportPage.tsx` (at `/support`)
 
 **App.tsx** is the root component managing UI state via `useState` and props drilling. Key state includes `gridSize` ({rows, cols}), `spacing`, `sortBy` ('date'|'alpha'|'rarity'|'platform'|'speed'|'custom'), `customOrder` (number[] of trophy IDs for manual ordering), `profileStat` ('none'|'rarest'|'topPlatform'|'avgRarity'), and many visual toggles. It uses `useIsMobile()` (768px breakpoint) to conditionally render **desktop** or **mobile** layouts:
 
 **Desktop layout (≥768px):** 3-column layout — TopBar + LeftPanel + CenterCanvas + RightPanel
-- **TopBar** — Header with PSN ID search input, logo, action buttons (Export, Share, PSN auth). Templates, Year Review, Compare, and Save buttons are hidden (logic preserved for future use). Share uses Web Share API → clipboard fallback → download fallback. Progress bar only renders during active loading.
+- **TopBar** — Header with PSN ID search input, logo, action buttons (Support, Export, Share, PSN auth). Templates, Year Review, Compare, and Save buttons are hidden (logic preserved for future use). Support button opens `/support` in a new tab. Share uses Web Share API → clipboard fallback → download fallback. Progress bar only renders during active loading.
 - **LeftPanel** — Settings controls (grid size, spacing, visual effects, sorting/filtering, profile stat selector). Collapsible via chevron toggle button on right edge. Scrollable (hidden scrollbar via Radix ScrollArea). Exports `SettingsContent` sub-component (shared with mobile drawer).
 - **CenterCanvas** — Main trophy grid display with zoom and profile header. Contains `ProfileCard` sub-component. Accepts optional `isMobile`, `tileSize`, `onTileTap` props.
 - **RightPanel** — Selected trophy detail view and drag-to-reorder mosaic tile list. Collapsible via chevron toggle button on left edge. Uses native scroll with `.scrollbar-hide`. Exports `TrophyDetailContent` and `MosaicTileList` sub-components (shared with mobile drawer).
 
 **Mobile layout (<768px):** Canvas-first with bottom drawers — TopBar (2 rows) + CenterCanvas (full width) + drawers
-- **TopBar (mobile)** — Row 1: logo + share/settings/overflow menu icons. Row 2: full-width search input with GO button. Overflow menu (MoreVertical) contains Export and PSN Auth.
+- **TopBar (mobile)** — Row 1: logo + share/settings/overflow menu icons. Row 2: full-width search input with GO button. Overflow menu (MoreVertical) contains Export, Support, and PSN Auth.
 - **CenterCanvas (mobile)** — Responsive tile sizing (`tileSize` computed from viewport width). No tooltips, no hover effects, no zoom controls. Tap on tile opens details drawer.
 - **MobileSettingsDrawer** — Bottom drawer (vaul) wrapping `SettingsContent`. Opens via ⚙️ button. Snap points: 50%, 90%.
 - **MobileDetailsDrawer** — Bottom drawer (vaul) wrapping `TrophyDetailContent` + `MosaicTileList`. Opens on tile tap. Snap points: 40% (preview), 85% (full + reorder).
@@ -40,6 +40,16 @@ No test framework is configured.
 **Modals:** `TemplatesModal`, `YearInReviewCard`, `CompareMode`, `AuthSettingsModal` are lazy-loaded via `React.lazy()` (currently hidden except AuthSettingsModal, logic preserved).
 
 Both side panels (desktop) support collapse/expand with `isOpen`/`onToggle` props (state managed in App.tsx). Panels animate width between `w-80` and `w-0` with `transition-all duration-300 ease-in-out`. LeftPanel uses Radix ScrollArea; RightPanel uses native overflow scroll with `.scrollbar-hide`. CenterCanvas auto-expands via `flex-1`.
+
+### Routing
+
+Uses React Router v7 (`react-router`). Configured in `src/main.tsx` with `BrowserRouter`:
+- `/` → `App` (main trophy gallery)
+- `/support` → `SupportPage` (`src/app/pages/SupportPage.tsx`)
+
+### Support Page
+
+Standalone page at `/support` with project description, donation links (MercadoPago for ARS, PayPal for USD), social links (GitHub, LinkedIn, Instagram), and contact email. Opens in new tab via Support button in TopBar. Styled with the same dark theme as the main app (no shared layout wrapper — self-contained).
 
 ### Custom Sort / Drag-to-Reorder
 
