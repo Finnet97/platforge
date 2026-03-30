@@ -23,9 +23,9 @@ if (process.env.NODE_ENV !== "production") {
 }
 app.use(express.json());
 
-// Rate limiting
-const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+// Rate limiting — validate: false prevents crash if trust proxy behaves differently in Express 5
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, validate: { xForwardedForHeader: false } });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, validate: { xForwardedForHeader: false } });
 app.use("/api/auth", authLimiter);
 app.use("/api", generalLimiter);
 
