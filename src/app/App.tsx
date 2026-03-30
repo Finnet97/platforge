@@ -157,8 +157,14 @@ function AppContent() {
       (el, opts) => toPng(el, { pixelRatio: 2, skipFonts: true, ...opts }),
     );
     if (!dataUrl) return null;
-    const res = await fetch(dataUrl);
-    return await res.blob();
+    // Convert data URL to Blob without fetch() — mobile browsers can fail
+    // on large data URL fetches, producing incomplete/corrupt images.
+    const [header, base64] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
   }, [captureMosaic]);
 
   const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
