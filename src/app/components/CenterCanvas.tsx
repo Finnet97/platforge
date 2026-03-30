@@ -46,6 +46,10 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
   processedTrophies: Trophy[];
   isMobile?: boolean;
 }) {
+  const avatarSrc = isMobile && profile.avatar && !profile.avatar.startsWith('data:')
+    ? `/api/image-proxy?url=${encodeURIComponent(profile.avatar)}`
+    : profile.avatar;
+
   const extraStat = (() => {
     if (profileStat === 'none') return null;
     if (profileStat === 'rarest' && profile.rarestPlatinum) {
@@ -70,7 +74,8 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
         {/* Avatar + Username */}
         <div className="flex items-center gap-2">
           <img
-            src={profile.avatar}
+            src={avatarSrc}
+            data-original-src={profile.avatar}
             alt={profile.username}
             className="w-8 h-8 rounded-full object-cover flex-shrink-0"
             style={{
@@ -125,7 +130,8 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
       {/* Avatar + Username */}
       <div className="flex items-center gap-3">
         <img
-          src={profile.avatar}
+          src={avatarSrc}
+          data-original-src={profile.avatar}
           alt={profile.username}
           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
           style={{
@@ -237,7 +243,15 @@ export function CenterCanvas({
     stackOffset: Math.max(16, Math.round(32 * scale)), // top-8 equivalent (for stacked badges)
   };
 
+  // On mobile, proxy PSN CDN images through our server to avoid cross-origin loading failures
+  const proxyUrl = (url: string | undefined) => {
+    if (!url) return url;
+    if (!isMobile || url.startsWith('data:') || url.startsWith('/api/')) return url;
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  };
+
   function renderTile(trophy: Trophy, index: number, heightOverride?: number) {
+    const rawSrc = useTrophyImage && trophy.trophyImageUrl ? trophy.trophyImageUrl : trophy.imageUrl;
     const tileDiv = (
       <div
         key={trophy.id}
@@ -260,7 +274,8 @@ export function CenterCanvas({
       >
         {/* Trophy Image */}
         <img
-          src={useTrophyImage && trophy.trophyImageUrl ? trophy.trophyImageUrl : trophy.imageUrl}
+          src={proxyUrl(rawSrc)}
+          data-original-src={rawSrc}
           alt={trophy.gameTitle}
           className="w-full h-full object-cover"
           style={{

@@ -36,10 +36,9 @@ app.use("/api/trophies", trophyRoutes);
 const ALLOWED_IMAGE_HOSTS = [
   "playstation.net",
   "playstation.com",
-  "psn-rsc.prod.dl.playstation.net",
   "sonyentertainmentnetwork.com",
-  "googleapis.com",
-  "ggpht.com",
+  "googleapis.com",  // PSN avatar CDN
+  "ggpht.com",       // PSN avatar CDN (alt)
 ];
 
 app.get("/api/image-proxy", async (req, res) => {
@@ -62,9 +61,7 @@ app.get("/api/image-proxy", async (req, res) => {
     parsed.protocol = "https:";
   }
 
-  const domainAllowed = ALLOWED_IMAGE_HOSTS.some(h => parsed.hostname.endsWith(h));
-  if (parsed.protocol !== "https:" || !domainAllowed) {
-    console.warn(`[image-proxy] Blocked: protocol=${parsed.protocol} hostname=${parsed.hostname} domainAllowed=${domainAllowed}`);
+  if (!ALLOWED_IMAGE_HOSTS.some(h => parsed.hostname.endsWith(h))) {
     res.status(403).json({ error: "Domain not allowed" });
     return;
   }

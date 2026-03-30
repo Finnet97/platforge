@@ -14,9 +14,6 @@ import { toPng, toJpeg } from 'html-to-image';
 // attempting (and failing) a cross-origin fetch that would produce a blank image.
 const TRANSPARENT_1PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAABJRU5ErkJggg==';
 
-const TemplatesModal = lazy(() => import('./components/TemplatesModal').then(m => ({ default: m.TemplatesModal })));
-const YearInReviewCard = lazy(() => import('./components/YearInReviewCard').then(m => ({ default: m.YearInReviewCard })));
-const CompareMode = lazy(() => import('./components/CompareMode').then(m => ({ default: m.CompareMode })));
 const AuthSettingsModal = lazy(() => import('./components/AuthSettingsModal').then(m => ({ default: m.AuthSettingsModal })));
 
 function parseTimeToPlatinum(time: string): number {
@@ -32,9 +29,6 @@ function AppContent() {
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const [selectedTile, setSelectedTile] = useState<number | null>(0);
-  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-  const [showYearInReview, setShowYearInReview] = useState(false);
-  const [showCompareMode, setShowCompareMode] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [gridSize, setGridSize] = useState({ rows: 5, cols: 5 });
 
@@ -139,7 +133,8 @@ function AppContent() {
       const batch = imgs.slice(i, i + 3);
       await Promise.all(
         batch.map(async (img) => {
-          const src = img.src;
+          // Use original PSN URL if available (mobile proxies images in preview)
+          const src = img.dataset.originalSrc || img.src;
           if (!src || src.startsWith('data:')) return;
           const dataUrl = await fetchImageAsDataUrl(src);
           img.src = dataUrl ?? TRANSPARENT_1PX;
@@ -171,15 +166,12 @@ function AppContent() {
       let dataUrl: string | null;
       const filename = `platforge-${Date.now()}`;
 
-      if ((format || fileType) === 'jpeg') {
-        dataUrl = await captureMosaic(
-          (el, opts) => toJpeg(el, { quality: 0.95, skipFonts: true, ...opts }),
-        );
-      } else {
-        dataUrl = await captureMosaic(
-          (el, opts) => toPng(el, { pixelRatio: 2, skipFonts: true, ...opts }),
-        );
-      }
+      const useJpeg = (format || fileType) === 'jpeg';
+      dataUrl = await captureMosaic(
+        (el, opts) => useJpeg
+          ? toJpeg(el, { quality: 0.95, skipFonts: true, ...opts })
+          : toPng(el, { pixelRatio: 2, skipFonts: true, ...opts }),
+      );
 
       if (!dataUrl) {
         showToast('Export failed — please try again');
@@ -486,21 +478,7 @@ function AppContent() {
         </div>
       )}
 
-      {/* Templates, Year Review, and Compare modals hidden for now
-      {showTemplatesModal && (
-        <TemplatesModal onClose={() => setShowTemplatesModal(false)} onApply={handleApplyTemplate} />
-      )}
-
-      {showYearInReview && (
-        <YearInReviewCard onClose={() => setShowYearInReview(false)} />
-      )}
-
-      {showCompareMode && (
-        <CompareMode onClose={() => setShowCompareMode(false)} />
-      )}
-      */}
-
-      {/* Modals wrapped in Suspense for lazy loading */}
+      {/* Modals */}
       <Suspense fallback={null}>
         {showAuthModal && (
           <AuthSettingsModal onClose={() => setShowAuthModal(false)} />
