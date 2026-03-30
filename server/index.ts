@@ -57,6 +57,11 @@ app.get("/api/image-proxy", async (req, res) => {
     return;
   }
 
+  // Upgrade http to https for allowed domains
+  if (parsed.protocol === "http:") {
+    parsed.protocol = "https:";
+  }
+
   const domainAllowed = ALLOWED_IMAGE_HOSTS.some(h => parsed.hostname.endsWith(h));
   if (parsed.protocol !== "https:" || !domainAllowed) {
     console.warn(`[image-proxy] Blocked: protocol=${parsed.protocol} hostname=${parsed.hostname} domainAllowed=${domainAllowed}`);
@@ -65,7 +70,7 @@ app.get("/api/image-proxy", async (req, res) => {
   }
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(parsed.toString());
     if (!response.ok) {
       res.status(response.status).end();
       return;
