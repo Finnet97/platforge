@@ -41,35 +41,26 @@ interface CenterCanvasProps {
 
 type ProfileStatType = 'none' | 'rarest' | 'topPlatform' | 'avgRarity';
 
-/** Cache an image on successful load by drawing it to a canvas. */
-function cacheImageOnLoad(e: React.SyntheticEvent<HTMLImageElement>, originalSrc: string) {
-  if (!originalSrc || originalSrc.startsWith('data:') || imageCache.has(originalSrc)) return;
-  const img = e.currentTarget;
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(img, 0, 0);
-    const dataUrl = canvas.toDataURL('image/png');
-    imageCache.set(originalSrc, dataUrl);
-  } catch { /* cross-origin taint — ignore */ }
+/**
+ * When an image loads successfully, queue it for background preloading
+ * through the server proxy so it's cached as a data URL for export.
+ */
+function handleImageLoad(_e: React.SyntheticEvent<HTMLImageElement>, originalSrc: string) {
+  if (!originalSrc || originalSrc.startsWith('data:')) return;
+  imageCache.enqueuePreload(originalSrc);
 }
 
-/** Retry proxy once, then try direct CDN, then give up. */
+/** On error: try proxy, then direct CDN, then give up. */
 function handleImageError(e: React.SyntheticEvent<HTMLImageElement>, originalSrc: string) {
   const img = e.currentTarget;
   const attempt = Number(img.dataset.retryAttempt || '0');
   if (attempt === 0) {
-    // Retry through proxy
     img.dataset.retryAttempt = '1';
     img.src = `/api/image-proxy?url=${encodeURIComponent(originalSrc)}&t=${Date.now()}`;
   } else if (attempt === 1) {
-    // Try direct CDN URL
     img.dataset.retryAttempt = '2';
     img.src = originalSrc;
   }
-  // After attempt 2, browser shows broken image — acceptable fallback
 }
 
 function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
@@ -78,9 +69,6 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
   processedTrophies: Trophy[];
   isMobile?: boolean;
 }) {
-  const avatarSrc = isMobile && profile.avatar && !profile.avatar.startsWith('data:')
-    ? `/api/image-proxy?url=${encodeURIComponent(profile.avatar)}`
-    : profile.avatar;
 
   const extraStat = (() => {
     if (profileStat === 'none') return null;
@@ -106,7 +94,7 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
         {/* Avatar + Username */}
         <div className="flex items-center gap-2">
           <img
-            src={avatarSrc}
+            src={profile.avatar}
             data-original-src={profile.avatar}
             data-avatar-img=""
             alt={profile.username}
@@ -115,7 +103,7 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
               border: '2px solid #FFD700',
               boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)'
             }}
-            onLoad={(e) => cacheImageOnLoad(e, profile.avatar)}
+            onLoad={(e) => handleImageLoad(e, profile.avatar)}
             onError={(e) => handleImageError(e, profile.avatar)}
           />
           <div className="flex flex-col justify-center">
@@ -165,7 +153,7 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
       {/* Avatar + Username */}
       <div className="flex items-center gap-3">
         <img
-          src={avatarSrc}
+          src={profile.avatar}
           data-original-src={profile.avatar}
           data-avatar-img=""
           alt={profile.username}
@@ -174,7 +162,7 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
             border: '2px solid #FFD700',
             boxShadow: '0 0 16px rgba(255, 215, 0, 0.3)'
           }}
-          onLoad={(e) => cacheImageOnLoad(e, profile.avatar)}
+          onLoad={(e) => handleImageLoad(e, profile.avatar)}
           onError={(e) => handleImageError(e, profile.avatar)}
         />
         <div className="flex flex-col justify-center">
@@ -281,13 +269,6 @@ export function CenterCanvas({
     stackOffset: Math.max(16, Math.round(32 * scale)), // top-8 equivalent (for stacked badges)
   };
 
-  // On mobile, proxy PSN CDN images through our server to avoid cross-origin loading failures
-  const proxyUrl = (url: string | undefined) => {
-    if (!url) return url;
-    if (!isMobile || url.startsWith('data:') || url.startsWith('/api/')) return url;
-    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
-  };
-
   function renderTile(trophy: Trophy, index: number, heightOverride?: number) {
     const rawSrc = useTrophyImage && trophy.trophyImageUrl ? trophy.trophyImageUrl : trophy.imageUrl;
     const tileDiv = (
@@ -312,11 +293,11 @@ export function CenterCanvas({
       >
         {/* Trophy Image */}
         <img
-          src={proxyUrl(rawSrc)}
+          src={rawSrc}
           data-original-src={rawSrc}
           alt={trophy.gameTitle}
           className="w-full h-full object-cover"
-          onLoad={(e) => cacheImageOnLoad(e, rawSrc)}
+          onLoad={(e) => handleImageLoad(e, rawSrc)}
           onError={(e) => handleImageError(e, rawSrc)}
           style={{
             borderRadius: tileRadius,

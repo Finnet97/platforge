@@ -1,20 +1,21 @@
 /**
  * Singleton image cache — maps original PSN CDN URLs to base64 data URLs.
- * Populated passively during preview (via canvas onLoad) and consumed
- * during export to avoid re-fetching through the proxy.
+ * Images are preloaded through the server proxy in the background after they
+ * load in the browser, so they're ready for export without re-fetching.
  */
 
 const MAX_ENTRIES = 200;
 
 class ImageCacheService {
   private cache = new Map<string, string>();
+  private queue: string[] = [];
+  private processing = false;
 
   get(url: string): string | undefined {
     return this.cache.get(url);
   }
 
   set(url: string, dataUrl: string): void {
-    // LRU-style eviction: delete oldest entries when over limit
     if (this.cache.size >= MAX_ENTRIES) {
       const firstKey = this.cache.keys().next().value;
       if (firstKey) this.cache.delete(firstKey);
@@ -49,8 +50,36 @@ class ImageCacheService {
     return null;
   }
 
+  /**
+   * Queue a URL for background preloading. URLs are processed one at a time
+   * with delays between requests to avoid PSN CDN rate limiting.
+   */
+  enqueuePreload(url: string): void {
+    if (!url || url.startsWith('data:') || this.cache.has(url)) return;
+    if (this.queue.includes(url)) return;
+    this.queue.push(url);
+    this.processQueue();
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.processing) return;
+    this.processing = true;
+
+    while (this.queue.length > 0) {
+      const url = this.queue.shift()!;
+      if (!this.cache.has(url)) {
+        await this.preload(url, 2);
+        // Small delay between requests to avoid rate limiting
+        await delay(150);
+      }
+    }
+
+    this.processing = false;
+  }
+
   clear(): void {
     this.cache.clear();
+    this.queue = [];
   }
 }
 
