@@ -11,6 +11,9 @@ import { initServiceAuth } from "./services/psn.js";
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
+// Trust reverse proxy (Railway, etc.) so express-rate-limit gets real client IPs
+app.set("trust proxy", 1);
+
 // CORS — only needed in dev (in production, frontend is served from same origin)
 if (process.env.NODE_ENV !== "production") {
   const allowedOrigins = process.env.CORS_ORIGIN
