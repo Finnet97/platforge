@@ -97,45 +97,10 @@ function AppContent() {
           reader.readAsDataURL(blob);
         });
       } catch {
-        // Retry after a short delay
         if (attempt < retries) await new Promise(r => setTimeout(r, 300));
       }
     }
     return null;
-  };
-
-  /** Proxies cross-origin images to data URLs for canvas capture, processing in sequential batches. */
-  const proxyImages = async (el: HTMLElement) => {
-    const imgs = Array.from(el.querySelectorAll('img'));
-    const originals: { img: HTMLImageElement; src: string }[] = [];
-
-    // Process in batches of 3 to avoid overwhelming the proxy/PSN
-    const batchSize = 3;
-    for (let i = 0; i < imgs.length; i += batchSize) {
-      const batch = imgs.slice(i, i + batchSize);
-      await Promise.all(
-        batch.map(async (img) => {
-          try {
-            const src = img.src;
-            if (!src || src.startsWith('data:')) return;
-            originals.push({ img, src });
-
-            const dataUrl = await fetchImageAsDataUrl(src);
-            if (!dataUrl) return; // Keep original if all retries fail
-
-            // Set data URL and wait for it to render
-            await new Promise<void>((resolve) => {
-              img.onload = () => resolve();
-              img.src = dataUrl;
-              if (img.complete) resolve();
-            });
-          } catch {
-            // Keep original src
-          }
-        })
-      );
-    }
-    return originals;
   };
 
   /** Returns capture options that scale mobile mosaic to desktop-equivalent size. */
@@ -148,73 +113,92 @@ function AppContent() {
       style: {
         transform: `scale(${ratio})`,
         transformOrigin: 'top left',
-        // Compensate border-radius so it visually matches desktop's 16px after scaling
         borderRadius: `${16 / ratio}px`,
         width: el.scrollWidth + 'px',
       },
     };
   };
 
-  /** Captures the mosaic as a PNG Blob, converting cross-origin images via proxy. */
-  const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
+  /** Clones the mosaic, converts images to data URLs in the clone, and captures it. */
+  const captureClone = useCallback(async (
+    renderFn: (el: HTMLElement, opts: object) => Promise<string>,
+    extraOpts: object = {},
+  ): Promise<string | null> => {
     const el = mosaicRef.current;
     if (!el) return null;
 
-    const originalTransform = el.style.transform;
-    el.style.transform = 'scale(1)';
-
-    const originals = await proxyImages(el);
+    // Work on a clone so the live DOM is never modified
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.style.transform = 'scale(1)';
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '0';
+    document.body.appendChild(clone);
 
     try {
-      const dataUrl = await toPng(el, { pixelRatio: 2, ...getExportOptions(el) });
-      const res = await fetch(dataUrl);
-      return await res.blob();
+      // Convert cross-origin images to data URLs in batches of 3
+      const imgs = Array.from(clone.querySelectorAll('img'));
+      for (let i = 0; i < imgs.length; i += 3) {
+        const batch = imgs.slice(i, i + 3);
+        await Promise.all(
+          batch.map(async (img) => {
+            const src = img.src;
+            if (!src || src.startsWith('data:')) return;
+            const dataUrl = await fetchImageAsDataUrl(src);
+            if (dataUrl) {
+              img.src = dataUrl;
+              await img.decode().catch(() => {});
+            }
+          })
+        );
+      }
+
+      return await renderFn(clone, { ...getExportOptions(el), ...extraOpts });
     } finally {
-      el.style.transform = originalTransform;
-      originals.forEach(({ img, src }) => { img.src = src; });
+      document.body.removeChild(clone);
     }
   }, [isMobile, mobileTileSize]);
 
-  const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
-    const el = mosaicRef.current;
-    if (!el) return;
-    const exportFormat = format || fileType;
+  /** Captures the mosaic as a PNG Blob. */
+  const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
+    const dataUrl = await captureClone(
+      (el, opts) => toPng(el, { pixelRatio: 2, ...opts }),
+    );
+    if (!dataUrl) return null;
+    const res = await fetch(dataUrl);
+    return await res.blob();
+  }, [captureClone]);
 
+  const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
     try {
-      if (exportFormat === 'png') {
-        const blob = await captureMosaicBlob();
-        if (!blob) {
-          showToast('Export failed — please try again');
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.download = `platforge-${Date.now()}.png`;
-        link.href = url;
-        link.click();
-        URL.revokeObjectURL(url);
+      let dataUrl: string | null;
+      const filename = `platforge-${Date.now()}`;
+
+      if ((format || fileType) === 'jpeg') {
+        dataUrl = await captureClone(
+          (el, opts) => toJpeg(el, { quality: 0.95, ...opts }),
+        );
       } else {
-        // JPEG path: capture directly since captureMosaicBlob is PNG-only
-        const originalTransform = el.style.transform;
-        el.style.transform = 'scale(1)';
-        const originals = await proxyImages(el);
-        try {
-          const dataUrl = await toJpeg(el, { quality: 0.95, ...getExportOptions(el) });
-          const link = document.createElement('a');
-          link.download = `platforge-${Date.now()}.jpeg`;
-          link.href = dataUrl;
-          link.click();
-        } finally {
-          el.style.transform = originalTransform;
-          originals.forEach(({ img, src }) => { img.src = src; });
-        }
+        dataUrl = await captureClone(
+          (el, opts) => toPng(el, { pixelRatio: 2, ...opts }),
+        );
       }
+
+      if (!dataUrl) {
+        showToast('Export failed — please try again');
+        return;
+      }
+
+      const link = document.createElement('a');
+      link.download = `${filename}.${(format || fileType)}`;
+      link.href = dataUrl;
+      link.click();
       showToast('Image downloaded');
     } catch (err) {
       console.warn('[export] Failed:', err);
       showToast('Export failed — please try again');
     }
-  }, [fileType, isMobile, mobileTileSize, captureMosaicBlob, showToast]);
+  }, [fileType, captureClone, showToast]);
 
   const handleShare = useCallback(async () => {
     try {
