@@ -3,6 +3,7 @@ import { Trophy as TrophyIcon, ZoomIn, ZoomOut, Maximize2, Gamepad2, Crown, Star
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { usePsnData, type Profile } from '../context/PsnDataContext';
 import type { Trophy } from '../data/mockData';
+import { imageCache } from '../services/imageCache';
 
 
 interface OverlaySettings {
@@ -40,6 +41,37 @@ interface CenterCanvasProps {
 
 type ProfileStatType = 'none' | 'rarest' | 'topPlatform' | 'avgRarity';
 
+/** Cache an image on successful load by drawing it to a canvas. */
+function cacheImageOnLoad(e: React.SyntheticEvent<HTMLImageElement>, originalSrc: string) {
+  if (!originalSrc || originalSrc.startsWith('data:') || imageCache.has(originalSrc)) return;
+  const img = e.currentTarget;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(img, 0, 0);
+    const dataUrl = canvas.toDataURL('image/png');
+    imageCache.set(originalSrc, dataUrl);
+  } catch { /* cross-origin taint — ignore */ }
+}
+
+/** Retry proxy once, then try direct CDN, then give up. */
+function handleImageError(e: React.SyntheticEvent<HTMLImageElement>, originalSrc: string) {
+  const img = e.currentTarget;
+  const attempt = Number(img.dataset.retryAttempt || '0');
+  if (attempt === 0) {
+    // Retry through proxy
+    img.dataset.retryAttempt = '1';
+    img.src = `/api/image-proxy?url=${encodeURIComponent(originalSrc)}&t=${Date.now()}`;
+  } else if (attempt === 1) {
+    // Try direct CDN URL
+    img.dataset.retryAttempt = '2';
+    img.src = originalSrc;
+  }
+  // After attempt 2, browser shows broken image — acceptable fallback
+}
+
 function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
   profile: Profile;
   profileStat: ProfileStatType;
@@ -76,12 +108,15 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
           <img
             src={avatarSrc}
             data-original-src={profile.avatar}
+            data-avatar-img=""
             alt={profile.username}
             className="w-8 h-8 rounded-full object-cover flex-shrink-0"
             style={{
               border: '2px solid #FFD700',
               boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)'
             }}
+            onLoad={(e) => cacheImageOnLoad(e, profile.avatar)}
+            onError={(e) => handleImageError(e, profile.avatar)}
           />
           <div className="flex flex-col justify-center">
             <p className="text-sm font-bold text-white leading-tight" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
@@ -132,12 +167,15 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
         <img
           src={avatarSrc}
           data-original-src={profile.avatar}
+          data-avatar-img=""
           alt={profile.username}
           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
           style={{
             border: '2px solid #FFD700',
             boxShadow: '0 0 16px rgba(255, 215, 0, 0.3)'
           }}
+          onLoad={(e) => cacheImageOnLoad(e, profile.avatar)}
+          onError={(e) => handleImageError(e, profile.avatar)}
         />
         <div className="flex flex-col justify-center">
           <p className="text-lg font-bold text-white leading-tight" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
@@ -278,6 +316,8 @@ export function CenterCanvas({
           data-original-src={rawSrc}
           alt={trophy.gameTitle}
           className="w-full h-full object-cover"
+          onLoad={(e) => cacheImageOnLoad(e, rawSrc)}
+          onError={(e) => handleImageError(e, rawSrc)}
           style={{
             borderRadius: tileRadius,
             border: showRarityHeatmap

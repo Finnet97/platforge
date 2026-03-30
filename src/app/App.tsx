@@ -9,6 +9,7 @@ import { MobileSettingsDrawer } from './components/MobileSettingsDrawer';
 import { MobileDetailsDrawer } from './components/MobileDetailsDrawer';
 import { PsnDataProvider, usePsnData } from './context/PsnDataContext';
 import { toPng, toJpeg } from 'html-to-image';
+import { imageCache } from './services/imageCache';
 
 // 1x1 transparent PNG used as fallback when proxy fails — prevents html-to-image from
 // attempting (and failing) a cross-origin fetch that would produce a blank image.
@@ -82,25 +83,6 @@ function AppContent() {
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
-  /** Converts a single image to a data URL via the proxy, with retry. */
-  const fetchImageAsDataUrl = async (src: string, retries = 2): Promise<string | null> => {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(src)}`);
-        if (!resp.ok) continue;
-        const blob = await resp.blob();
-        return await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      } catch {
-        if (attempt < retries) await new Promise(r => setTimeout(r, 300));
-      }
-    }
-    return null;
-  };
-
   /** Returns capture options that scale mobile mosaic to desktop-equivalent size. */
   const getExportOptions = (el: HTMLElement) => {
     if (!isMobile) return {};
@@ -117,7 +99,11 @@ function AppContent() {
     };
   };
 
-  /** Converts images to data URLs in-place, captures, then restores originals. */
+  /**
+   * Clone-based capture — never modifies the live DOM so React re-renders
+   * cannot cause missing images. Images are converted to data URLs on the
+   * clone, using the imageCache populated during preview.
+   */
   const captureMosaic = useCallback(async (
     renderFn: (el: HTMLElement, opts: object) => Promise<string>,
     extraOpts: object = {},
@@ -125,29 +111,44 @@ function AppContent() {
     const el = mosaicRef.current;
     if (!el) return null;
 
-    // Convert cross-origin images to data URLs in-place (batches of 3)
-    const imgs = Array.from(el.querySelectorAll('img'));
-    const originalSrcs = imgs.map((img) => img.src);
+    // 1. Synchronous deep clone — immune to React re-renders
+    const clone = el.cloneNode(true) as HTMLElement;
 
-    for (let i = 0; i < imgs.length; i += 3) {
-      const batch = imgs.slice(i, i + 3);
-      await Promise.all(
-        batch.map(async (img) => {
-          // Use original PSN URL if available (mobile proxies images in preview)
-          const src = img.dataset.originalSrc || img.src;
-          if (!src || src.startsWith('data:')) return;
-          const dataUrl = await fetchImageAsDataUrl(src);
-          img.src = dataUrl ?? TRANSPARENT_1PX;
-          await img.decode().catch(() => {});
-        })
-      );
-    }
+    // 2. Position off-screen but in-document (needed for getComputedStyle)
+    clone.style.position = 'fixed';
+    clone.style.left = '-99999px';
+    clone.style.top = '0';
+    clone.style.zIndex = '-1';
+    document.body.appendChild(clone);
 
     try {
-      return await renderFn(el, { ...getExportOptions(el), ...extraOpts });
+      // 3. Convert images to data URLs on the clone (batches of 5)
+      const imgs = Array.from(clone.querySelectorAll('img'));
+      for (let i = 0; i < imgs.length; i += 5) {
+        const batch = imgs.slice(i, i + 5);
+        await Promise.all(
+          batch.map(async (img) => {
+            const originalSrc = img.dataset.originalSrc || img.src;
+            if (!originalSrc || originalSrc.startsWith('data:')) return;
+
+            // Use cache (populated during preview) or fetch via proxy
+            const cached = imageCache.get(originalSrc);
+            const dataUrl = cached ?? await imageCache.preload(originalSrc, 3);
+            img.src = dataUrl ?? TRANSPARENT_1PX;
+            await img.decode().catch(() => {});
+          })
+        );
+      }
+
+      // 4. Fix avatar boxShadow stain (html-to-image renders it as yellow artifact)
+      const avatarImg = clone.querySelector('[data-avatar-img]') as HTMLElement | null;
+      if (avatarImg) avatarImg.style.boxShadow = 'none';
+
+      // 5. Capture the clone
+      return await renderFn(clone, { ...getExportOptions(el), ...extraOpts });
     } finally {
-      // Restore original srcs so the live DOM uses CDN URLs again
-      imgs.forEach((img, i) => { img.src = originalSrcs[i]; });
+      // 6. Remove clone from document
+      document.body.removeChild(clone);
     }
   }, [isMobile, mobileTileSize]);
 

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect, ty
 import type { Trophy } from "../data/mockData";
 import { mockTrophies, mockProfile } from "../data/mockData";
 import { fetchJson, postJson } from "../services/api";
+import { imageCache } from "../services/imageCache";
 
 export interface Profile {
   username: string;
@@ -118,6 +119,7 @@ export function PsnDataProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError(null);
     setLoadingProgress({ loaded: 0, total: 0 });
+    imageCache.clear();
 
     try {
       // 1. Fetch profile + basic trophy data
