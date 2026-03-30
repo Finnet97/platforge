@@ -34,11 +34,11 @@ app.use("/api/trophies", trophyRoutes);
 
 // Image proxy — allows html-to-image to capture cross-origin images
 const ALLOWED_IMAGE_HOSTS = [
-  "image.api.playstation.com",
-  "psnobj.playstation.net",
-  "store.playstation.com",
   "playstation.net",
   "playstation.com",
+  "sonyentertainmentnetwork.com",
+  "googleapis.com",
+  "ggpht.com",
 ];
 
 app.get("/api/image-proxy", async (req, res) => {
@@ -57,6 +57,7 @@ app.get("/api/image-proxy", async (req, res) => {
   }
 
   if (parsed.protocol !== "https:" || !ALLOWED_IMAGE_HOSTS.some(h => parsed.hostname.endsWith(h))) {
+    console.warn(`[image-proxy] Blocked domain: ${parsed.hostname}`);
     res.status(403).json({ error: "Domain not allowed" });
     return;
   }
