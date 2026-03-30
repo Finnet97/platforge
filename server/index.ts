@@ -36,6 +36,7 @@ app.use("/api/trophies", trophyRoutes);
 const ALLOWED_IMAGE_HOSTS = [
   "playstation.net",
   "playstation.com",
+  "psn-rsc.prod.dl.playstation.net",
   "sonyentertainmentnetwork.com",
   "googleapis.com",
   "ggpht.com",
