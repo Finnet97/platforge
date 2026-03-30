@@ -57,8 +57,9 @@ app.get("/api/image-proxy", async (req, res) => {
     return;
   }
 
-  if (parsed.protocol !== "https:" || !ALLOWED_IMAGE_HOSTS.some(h => parsed.hostname.endsWith(h))) {
-    console.warn(`[image-proxy] Blocked domain: ${parsed.hostname}`);
+  const domainAllowed = ALLOWED_IMAGE_HOSTS.some(h => parsed.hostname.endsWith(h));
+  if (parsed.protocol !== "https:" || !domainAllowed) {
+    console.warn(`[image-proxy] Blocked: protocol=${parsed.protocol} hostname=${parsed.hostname} domainAllowed=${domainAllowed}`);
     res.status(403).json({ error: "Domain not allowed" });
     return;
   }
