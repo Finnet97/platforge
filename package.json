@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.server.json",
-    "start": "node dist-server/index.js",
+    "build": "vite build",
+    "start": "tsx server/index.ts",
     "dev": "concurrently \"vite\" \"NODE_TLS_REJECT_UNAUTHORIZED=0 tsx watch server/index.ts\"",
     "dev:client": "vite",
     "dev:server": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx watch server/index.ts"
