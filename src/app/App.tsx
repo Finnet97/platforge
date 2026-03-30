@@ -123,53 +123,48 @@ function AppContent() {
     };
   };
 
-  /** Clones the mosaic, converts images to data URLs in the clone, and captures it. */
-  const captureClone = useCallback(async (
+  /** Converts images to data URLs in-place, captures, then restores originals. */
+  const captureMosaic = useCallback(async (
     renderFn: (el: HTMLElement, opts: object) => Promise<string>,
     extraOpts: object = {},
   ): Promise<string | null> => {
     const el = mosaicRef.current;
     if (!el) return null;
 
-    // Work on a clone so the live DOM is never modified
-    const clone = el.cloneNode(true) as HTMLElement;
-    clone.style.transform = 'scale(1)';
-    clone.style.position = 'absolute';
-    clone.style.left = '-9999px';
-    clone.style.top = '0';
-    document.body.appendChild(clone);
+    // Convert cross-origin images to data URLs in-place (batches of 3)
+    const imgs = Array.from(el.querySelectorAll('img'));
+    const originalSrcs = imgs.map((img) => img.src);
+
+    for (let i = 0; i < imgs.length; i += 3) {
+      const batch = imgs.slice(i, i + 3);
+      await Promise.all(
+        batch.map(async (img) => {
+          const src = img.src;
+          if (!src || src.startsWith('data:')) return;
+          const dataUrl = await fetchImageAsDataUrl(src);
+          img.src = dataUrl ?? TRANSPARENT_1PX;
+          await img.decode().catch(() => {});
+        })
+      );
+    }
 
     try {
-      // Convert cross-origin images to data URLs in batches of 3
-      const imgs = Array.from(clone.querySelectorAll('img'));
-      for (let i = 0; i < imgs.length; i += 3) {
-        const batch = imgs.slice(i, i + 3);
-        await Promise.all(
-          batch.map(async (img) => {
-            const src = img.src;
-            if (!src || src.startsWith('data:')) return;
-            const dataUrl = await fetchImageAsDataUrl(src);
-            img.src = dataUrl ?? TRANSPARENT_1PX;
-            await img.decode().catch(() => {});
-          })
-        );
-      }
-
-      return await renderFn(clone, { ...getExportOptions(el), ...extraOpts });
+      return await renderFn(el, { ...getExportOptions(el), ...extraOpts });
     } finally {
-      document.body.removeChild(clone);
+      // Restore original srcs so the live DOM uses CDN URLs again
+      imgs.forEach((img, i) => { img.src = originalSrcs[i]; });
     }
   }, [isMobile, mobileTileSize]);
 
   /** Captures the mosaic as a PNG Blob. */
   const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
-    const dataUrl = await captureClone(
+    const dataUrl = await captureMosaic(
       (el, opts) => toPng(el, { pixelRatio: 2, skipFonts: true, ...opts }),
     );
     if (!dataUrl) return null;
     const res = await fetch(dataUrl);
     return await res.blob();
-  }, [captureClone]);
+  }, [captureMosaic]);
 
   const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
     try {
@@ -177,11 +172,11 @@ function AppContent() {
       const filename = `platforge-${Date.now()}`;
 
       if ((format || fileType) === 'jpeg') {
-        dataUrl = await captureClone(
+        dataUrl = await captureMosaic(
           (el, opts) => toJpeg(el, { quality: 0.95, skipFonts: true, ...opts }),
         );
       } else {
-        dataUrl = await captureClone(
+        dataUrl = await captureMosaic(
           (el, opts) => toPng(el, { pixelRatio: 2, skipFonts: true, ...opts }),
         );
       }
@@ -200,7 +195,7 @@ function AppContent() {
       console.warn('[export] Failed:', err);
       showToast('Export failed — please try again');
     }
-  }, [fileType, captureClone, showToast]);
+  }, [fileType, captureMosaic, showToast]);
 
   const handleShare = useCallback(async () => {
     try {
