@@ -10,6 +10,10 @@ import { MobileDetailsDrawer } from './components/MobileDetailsDrawer';
 import { PsnDataProvider, usePsnData } from './context/PsnDataContext';
 import { toPng, toJpeg } from 'html-to-image';
 
+// 1x1 transparent PNG used as fallback when proxy fails — prevents html-to-image from
+// attempting (and failing) a cross-origin fetch that would produce a blank image.
+const TRANSPARENT_1PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAABJRU5ErkJggg==';
+
 const TemplatesModal = lazy(() => import('./components/TemplatesModal').then(m => ({ default: m.TemplatesModal })));
 const YearInReviewCard = lazy(() => import('./components/YearInReviewCard').then(m => ({ default: m.YearInReviewCard })));
 const CompareMode = lazy(() => import('./components/CompareMode').then(m => ({ default: m.CompareMode })));
@@ -145,10 +149,8 @@ function AppContent() {
             const src = img.src;
             if (!src || src.startsWith('data:')) return;
             const dataUrl = await fetchImageAsDataUrl(src);
-            if (dataUrl) {
-              img.src = dataUrl;
-              await img.decode().catch(() => {});
-            }
+            img.src = dataUrl ?? TRANSPARENT_1PX;
+            await img.decode().catch(() => {});
           })
         );
       }
@@ -162,7 +164,7 @@ function AppContent() {
   /** Captures the mosaic as a PNG Blob. */
   const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
     const dataUrl = await captureClone(
-      (el, opts) => toPng(el, { pixelRatio: 2, ...opts }),
+      (el, opts) => toPng(el, { pixelRatio: 2, skipFonts: true, ...opts }),
     );
     if (!dataUrl) return null;
     const res = await fetch(dataUrl);
@@ -176,11 +178,11 @@ function AppContent() {
 
       if ((format || fileType) === 'jpeg') {
         dataUrl = await captureClone(
-          (el, opts) => toJpeg(el, { quality: 0.95, ...opts }),
+          (el, opts) => toJpeg(el, { quality: 0.95, skipFonts: true, ...opts }),
         );
       } else {
         dataUrl = await captureClone(
-          (el, opts) => toPng(el, { pixelRatio: 2, ...opts }),
+          (el, opts) => toPng(el, { pixelRatio: 2, skipFonts: true, ...opts }),
         );
       }
 

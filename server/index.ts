@@ -9,6 +9,7 @@ import trophyRoutes from "./routes/trophies.js";
 import { initServiceAuth } from "./services/psn.js";
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
 // CORS — only needed in dev (in production, frontend is served from same origin)
@@ -21,8 +22,8 @@ if (process.env.NODE_ENV !== "production") {
 app.use(express.json());
 
 // Rate limiting
-const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, validate: { xForwardedForHeader: false } });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, validate: { xForwardedForHeader: false } });
 app.use("/api/auth", authLimiter);
 app.use("/api", generalLimiter);
 
