@@ -11,9 +11,6 @@ import { initServiceAuth } from "./services/psn.js";
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
-// Trust reverse proxy (Railway, etc.) so express-rate-limit gets real client IPs
-app.set("trust proxy", 1);
-
 // CORS — only needed in dev (in production, frontend is served from same origin)
 if (process.env.NODE_ENV !== "production") {
   const allowedOrigins = process.env.CORS_ORIGIN
@@ -23,9 +20,9 @@ if (process.env.NODE_ENV !== "production") {
 }
 app.use(express.json());
 
-// Rate limiting — validate: false prevents crash if trust proxy behaves differently in Express 5
-const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, validate: { xForwardedForHeader: false } });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, validate: { xForwardedForHeader: false } });
+// Rate limiting
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 app.use("/api/auth", authLimiter);
 app.use("/api", generalLimiter);
 
@@ -36,8 +33,9 @@ app.use("/api/trophies", trophyRoutes);
 
 // Image proxy — allows html-to-image to capture cross-origin images
 const ALLOWED_IMAGE_HOSTS = [
-  ".playstation.com",
-  ".playstation.net",
+  "image.api.playstation.com",
+  "psnobj.playstation.net",
+  "store.playstation.com",
 ];
 
 app.get("/api/image-proxy", async (req, res) => {
