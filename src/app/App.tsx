@@ -144,7 +144,15 @@ function AppContent() {
       const avatarImg = clone.querySelector('[data-avatar-img]') as HTMLElement | null;
       if (avatarImg) avatarImg.style.boxShadow = 'none';
 
-      // 5. Capture the clone
+      // 5. Remove off-screen positioning before capture — html-to-image clones
+      //    the element internally and copies inline styles, so leaving these
+      //    would render the content at -99999px (producing a black image).
+      clone.style.position = '';
+      clone.style.left = '';
+      clone.style.top = '';
+      clone.style.zIndex = '';
+
+      // 6. Capture the clone
       return await renderFn(clone, { ...getExportOptions(el), ...extraOpts });
     } finally {
       // 6. Remove clone from document
