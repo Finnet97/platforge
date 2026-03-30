@@ -80,6 +80,7 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
             className="w-8 h-8 rounded-full object-cover flex-shrink-0"
             style={{
               border: '2px solid #FFD700',
+              boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)'
             }}
           />
           <div className="flex flex-col justify-center">
@@ -135,6 +136,7 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
           style={{
             border: '2px solid #FFD700',
+            boxShadow: '0 0 16px rgba(255, 215, 0, 0.3)'
           }}
         />
         <div className="flex flex-col justify-center">
