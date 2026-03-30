@@ -37,6 +37,8 @@ const ALLOWED_IMAGE_HOSTS = [
   "image.api.playstation.com",
   "psnobj.playstation.net",
   "store.playstation.com",
+  "playstation.net",
+  "playstation.com",
 ];
 
 app.get("/api/image-proxy", async (req, res) => {
