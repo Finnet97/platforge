@@ -67,7 +67,9 @@ app.get("/api/image-proxy", async (req, res) => {
   }
 
   try {
-    const response = await fetch(parsed.toString(), { signal: AbortSignal.timeout(10000) });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(parsed.toString(), { signal: controller.signal }).finally(() => clearTimeout(timeout));
     if (!response.ok) {
       res.status(response.status).end();
       return;
