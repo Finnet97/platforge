@@ -59,10 +59,18 @@ async function getServiceAuth(): Promise<AuthorizationPayload> {
       serviceAuthExpiresAt = Date.now() + serviceAuthTokens.expiresIn * 1000;
       console.log("[psn] Service account token refreshed");
     } catch {
-      serviceAuthTokens = null;
-      serviceAuthExpiresAt = 0;
-      console.error("[psn] Service account token refresh failed — public mode unavailable");
-      throw new Error("Service account session expired. Public mode unavailable.");
+      // Refresh failed — try full re-authentication from NPSSO
+      console.warn("[psn] Token refresh failed, attempting re-authentication from NPSSO...");
+      try {
+        await initServiceAuth();
+        if (!serviceAuthTokens) throw new Error("Re-auth produced no tokens");
+        console.log("[psn] Service account re-authenticated successfully");
+      } catch {
+        serviceAuthTokens = null;
+        serviceAuthExpiresAt = 0;
+        console.error("[psn] Service account re-authentication failed — public mode unavailable");
+        throw new Error("Service account session expired. Public mode unavailable.");
+      }
     }
   }
 

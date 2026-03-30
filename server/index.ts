@@ -33,9 +33,8 @@ app.use("/api/trophies", trophyRoutes);
 
 // Image proxy — allows html-to-image to capture cross-origin images
 const ALLOWED_IMAGE_HOSTS = [
-  "image.api.playstation.com",
-  "psnobj.playstation.net",
-  "store.playstation.com",
+  ".playstation.com",
+  ".playstation.net",
 ];
 
 app.get("/api/image-proxy", async (req, res) => {

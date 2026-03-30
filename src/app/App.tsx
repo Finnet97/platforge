@@ -62,7 +62,6 @@ function AppContent() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const mosaicRef = useRef<HTMLDivElement | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const imageCacheRef = useRef<Map<string, string>>(new Map());
 
   const mobileTileSize = useMemo(() => {
     if (!isMobile) return 128;
@@ -85,84 +84,57 @@ function AppContent() {
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
-  // Pre-cache trophy images as data URLs in the background for reliable export
-  useEffect(() => {
-    const cache = imageCacheRef.current;
-    const abort = new AbortController();
-
-    const urls = trophies.flatMap(t => {
-      const result: string[] = [t.imageUrl];
-      if (t.trophyImageUrl) result.push(t.trophyImageUrl);
-      return result;
-    }).filter(url => url && !url.startsWith('data:') && !cache.has(url));
-
-    if (urls.length === 0) return;
-
-    (async () => {
-      for (let i = 0; i < urls.length; i += 3) {
-        if (abort.signal.aborted) return;
-        const batch = urls.slice(i, i + 3);
-        await Promise.allSettled(batch.map(async (url) => {
-          try {
-            const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`, { signal: abort.signal });
-            if (!resp.ok) return;
-            const blob = await resp.blob();
-            const dataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-            cache.set(url, dataUrl);
-          } catch {
-            // Will retry at capture time if needed
-          }
-        }));
-        if (i + 3 < urls.length) {
-          await new Promise(r => setTimeout(r, 200));
-        }
+  /** Converts a single image to a data URL via the proxy, with retry. */
+  const fetchImageAsDataUrl = async (src: string, retries = 2): Promise<string | null> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(src)}`);
+        if (!resp.ok) continue;
+        const blob = await resp.blob();
+        return await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        // Retry after a short delay
+        if (attempt < retries) await new Promise(r => setTimeout(r, 300));
       }
-    })();
+    }
+    return null;
+  };
 
-    return () => abort.abort();
-  }, [trophies]);
-
-  /** Proxies cross-origin images to data URLs for canvas capture. Uses pre-cached data URLs when available. */
+  /** Proxies cross-origin images to data URLs for canvas capture, processing in sequential batches. */
   const proxyImages = async (el: HTMLElement) => {
-    const imgs = el.querySelectorAll('img');
+    const imgs = Array.from(el.querySelectorAll('img'));
     const originals: { img: HTMLImageElement; src: string }[] = [];
-    const cache = imageCacheRef.current;
 
-    await Promise.all(
-      Array.from(imgs).map(async (img) => {
-        try {
-          const src = img.src;
-          if (!src || src.startsWith('data:')) return;
-          originals.push({ img, src });
+    // Process in batches of 3 to avoid overwhelming the proxy/PSN
+    const batchSize = 3;
+    for (let i = 0; i < imgs.length; i += batchSize) {
+      const batch = imgs.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async (img) => {
+          try {
+            const src = img.src;
+            if (!src || src.startsWith('data:')) return;
+            originals.push({ img, src });
 
-          let dataUrl = cache.get(src);
-          if (!dataUrl) {
-            // Cache miss — fetch through proxy as fallback
-            const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(src)}`);
-            const blob = await resp.blob();
-            dataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
+            const dataUrl = await fetchImageAsDataUrl(src);
+            if (!dataUrl) return; // Keep original if all retries fail
+
+            // Set data URL and wait for it to render
+            await new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.src = dataUrl;
+              if (img.complete) resolve();
             });
-            cache.set(src, dataUrl);
+          } catch {
+            // Keep original src
           }
-
-          // Set data URL and wait for the image to load
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.src = dataUrl!;
-            if (img.complete) resolve();
-          });
-        } catch {
-          // Keep original src if all else fails
-        }
-      })
-    );
+        })
+      );
+    }
     return originals;
   };
 
@@ -183,7 +155,7 @@ function AppContent() {
     };
   };
 
-  /** Captures the mosaic as a PNG Blob, handling cross-origin images via proxy. */
+  /** Captures the mosaic as a PNG Blob, converting cross-origin images via proxy. */
   const captureMosaicBlob = useCallback(async (): Promise<Blob | null> => {
     const el = mosaicRef.current;
     if (!el) return null;
