@@ -24,7 +24,9 @@ app.use(express.json());
 // Rate limiting
 const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, validate: { xForwardedForHeader: false } });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, validate: { xForwardedForHeader: false } });
+const proxyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, validate: { xForwardedForHeader: false } });
 app.use("/api/auth", authLimiter);
+app.use("/api/image-proxy", proxyLimiter);
 app.use("/api", generalLimiter);
 
 // Routes
@@ -40,6 +42,22 @@ const ALLOWED_IMAGE_HOSTS = [
   "googleapis.com",  // PSN avatar CDN
   "ggpht.com",       // PSN avatar CDN (alt)
 ];
+
+const PROXY_HEADERS: Record<string, string> = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Referer": "https://www.playstation.com/",
+  "Sec-Fetch-Dest": "image",
+  "Sec-Fetch-Mode": "no-cors",
+  "Sec-Fetch-Site": "cross-site",
+};
+
+const PROXY_MAX_ATTEMPTS = 3;
+const PROXY_TIMEOUT_MS = 15000;
+const PROXY_BACKOFF = [0, 500, 1500];
+
+function delayMs(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 app.get("/api/image-proxy", async (req, res) => {
   const url = req.query.url as string;
@@ -66,21 +84,38 @@ app.get("/api/image-proxy", async (req, res) => {
     return;
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const response = await fetch(parsed.toString(), { signal: controller.signal }).finally(() => clearTimeout(timeout));
-    if (!response.ok) {
-      res.status(response.status).end();
+  for (let attempt = 0; attempt < PROXY_MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) await delayMs(PROXY_BACKOFF[attempt]);
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+      const response = await fetch(parsed.toString(), {
+        signal: controller.signal,
+        headers: PROXY_HEADERS,
+      }).finally(() => clearTimeout(timeout));
+
+      if (!response.ok) {
+        // Don't retry 4xx errors (permanent failures)
+        if (response.status < 500 || attempt === PROXY_MAX_ATTEMPTS - 1) {
+          res.status(response.status).end();
+          return;
+        }
+        continue;
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (contentType) res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
       return;
+    } catch {
+      if (attempt === PROXY_MAX_ATTEMPTS - 1) {
+        res.status(502).json({ error: "Failed to fetch image" });
+        return;
+      }
     }
-    const contentType = response.headers.get("content-type");
-    if (contentType) res.setHeader("Content-Type", contentType);
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    const buffer = Buffer.from(await response.arrayBuffer());
-    res.send(buffer);
-  } catch {
-    res.status(502).json({ error: "Failed to fetch image" });
   }
 });
 

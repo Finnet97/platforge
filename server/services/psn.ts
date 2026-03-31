@@ -14,6 +14,38 @@ async function getPsnApi() {
   return psnApi;
 }
 
+// --- Patch fetch for PSN API: add browser-like headers ---
+// PSN data endpoints behind Akamai WAF may block requests without a browser
+// User-Agent. isomorphic-unfetch (used by psn-api) delegates to globalThis.fetch
+// in Node.js 18+, which sends no User-Agent by default.
+const PSN_DOMAINS = ["playstation.com", "playstation.net", "sonyentertainmentnetwork.com"];
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+const _originalFetch = globalThis.fetch;
+globalThis.fetch = async function psnFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+  if (PSN_DOMAINS.some(d => url.includes(d))) {
+    const existingHeaders = init?.headers
+      ? (init.headers instanceof Headers
+          ? Object.fromEntries(init.headers.entries())
+          : Array.isArray(init.headers)
+            ? Object.fromEntries(init.headers)
+            : init.headers as Record<string, string>)
+      : {};
+
+    return _originalFetch(input, {
+      ...init,
+      headers: { ...BROWSER_HEADERS, ...existingHeaders },
+    });
+  }
+
+  return _originalFetch(input, init);
+} as typeof fetch;
+
 // --- User auth state (optional, for private profiles) ---
 let userAuthTokens: AuthTokensResponse | null = null;
 let userAuthExpiresAt: number = 0;

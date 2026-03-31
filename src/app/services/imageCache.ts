@@ -4,7 +4,7 @@
  * load in the browser, so they're ready for export without re-fetching.
  */
 
-const MAX_ENTRIES = 200;
+const MAX_ENTRIES = 500;
 
 class ImageCacheService {
   private cache = new Map<string, string>();
@@ -48,6 +48,44 @@ class ImageCacheService {
       }
     }
     return null;
+  }
+
+  /**
+   * Ensure all given URLs are cached as data URLs before export.
+   * Uses a concurrency pool to fetch missing images in parallel.
+   */
+  async ensureAllCached(
+    urls: string[],
+    onProgress?: (done: number, total: number, failed: number) => void,
+  ): Promise<{ cached: number; failed: string[] }> {
+    const unique = [...new Set(urls)];
+    const missing = unique.filter(u => u && !u.startsWith('data:') && !this.cache.has(u));
+    const alreadyCached = unique.length - missing.length;
+    const failedUrls: string[] = [];
+    let done = 0;
+
+    onProgress?.(alreadyCached, unique.length, 0);
+
+    if (missing.length === 0) {
+      return { cached: unique.length, failed: [] };
+    }
+
+    // Concurrency pool of 5 workers
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(5, missing.length) }, async () => {
+      while (nextIndex < missing.length) {
+        const idx = nextIndex++;
+        const url = missing[idx];
+        const result = await this.preload(url, 3);
+        if (!result) failedUrls.push(url);
+        done++;
+        onProgress?.(alreadyCached + done, unique.length, failedUrls.length);
+      }
+    });
+
+    await Promise.all(workers);
+
+    return { cached: unique.length - failedUrls.length, failed: failedUrls };
   }
 
   /**

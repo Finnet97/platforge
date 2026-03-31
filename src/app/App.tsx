@@ -78,9 +78,17 @@ function AppContent() {
     }
   }, [isMobile]);
 
-  const showToast = useCallback((message: string) => {
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const showToast = useCallback((message: string, persistent = false) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(message);
-    setTimeout(() => setToastMessage(null), 3000);
+    if (!persistent) {
+      toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
+    }
+  }, []);
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage(null);
   }, []);
 
   /** Returns capture options that scale mobile mosaic to desktop-equivalent size. */
@@ -176,8 +184,41 @@ function AppContent() {
     return new Blob([bytes], { type: mime });
   }, [captureMosaic]);
 
+  /** Collect all image URLs from the live mosaic DOM (before cloning). */
+  const collectMosaicImageUrls = useCallback((): string[] => {
+    const el = mosaicRef.current;
+    if (!el) return [];
+    const urls: string[] = [];
+    el.querySelectorAll('img').forEach((img) => {
+      const src = img.dataset.originalSrc || img.src;
+      if (src && !src.startsWith('data:')) urls.push(src);
+    });
+    return urls;
+  }, []);
+
+  /** Pre-cache all mosaic images via proxy before export/share. */
+  const preCacheImages = useCallback(async (): Promise<void> => {
+    const urls = collectMosaicImageUrls();
+    if (urls.length === 0) return;
+
+    showToast(`Preparing export... (0/${urls.length})`, true);
+
+    const result = await imageCache.ensureAllCached(urls, (done, total) => {
+      setToastMessage(`Preparing export... (${done}/${total})`);
+    });
+
+    dismissToast();
+
+    if (result.failed.length > 0) {
+      showToast(`${result.failed.length} image${result.failed.length > 1 ? 's' : ''} may be missing`);
+      await new Promise(r => setTimeout(r, 1200));
+    }
+  }, [collectMosaicImageUrls, showToast, dismissToast]);
+
   const handleExport = useCallback(async (format?: 'png' | 'jpeg') => {
     try {
+      await preCacheImages();
+
       let dataUrl: string | null;
       const filename = `platforge-${Date.now()}`;
 
@@ -202,10 +243,12 @@ function AppContent() {
       console.warn('[export] Failed:', err);
       showToast('Export failed — please try again');
     }
-  }, [fileType, captureMosaic, showToast]);
+  }, [fileType, captureMosaic, showToast, preCacheImages]);
 
   const handleShare = useCallback(async () => {
     try {
+      await preCacheImages();
+
       const blob = await captureMosaicBlob();
       if (!blob) {
         showToast('Share failed — please try again');
@@ -248,7 +291,7 @@ function AppContent() {
       console.warn('[share] Failed:', err);
       showToast('Share failed — please try again');
     }
-  }, [captureMosaicBlob, showToast]);
+  }, [captureMosaicBlob, showToast, preCacheImages]);
 
   const handleApplyTemplate = useCallback((settings: TemplateSettings) => {
     setGridSize(settings.gridSize);
