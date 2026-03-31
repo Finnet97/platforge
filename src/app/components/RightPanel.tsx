@@ -4,6 +4,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { GripVertical, Clock, TrendingUp, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePsnData } from '../context/PsnDataContext';
 import type { Trophy } from '../data/mockData';
+import { handleImageError, handleImageLoad } from '../utils/imageRetry';
 
 const TILE_DND_TYPE = 'TILE';
 
@@ -74,8 +75,11 @@ function DraggableTile({ trophy, index, isSelected, onSelect, onMove }: Draggabl
       </div>
       <img
         src={trophy.imageUrl}
+        data-original-src={trophy.imageUrl}
         alt={trophy.gameTitle}
         className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-[#1E2740]"
+        onLoad={(e) => handleImageLoad(e, trophy.imageUrl)}
+        onError={(e) => handleImageError(e, trophy.imageUrl)}
       />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-white truncate leading-tight" style={{ fontFamily: 'Inter, sans-serif' }}>
@@ -127,8 +131,11 @@ export function TrophyDetailContent({ selectedTrophy, totalPlatinums }: TrophyDe
         <div className="relative h-40 overflow-hidden">
           <img
             src={selectedTrophy.imageUrl}
+            data-original-src={selectedTrophy.imageUrl}
             alt={selectedTrophy.gameTitle}
             className="w-full h-full object-cover"
+            onLoad={(e) => handleImageLoad(e, selectedTrophy.imageUrl)}
+            onError={(e) => handleImageError(e, selectedTrophy.imageUrl)}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#12172A] via-transparent to-transparent" />
         </div>

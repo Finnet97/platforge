@@ -3,7 +3,7 @@ import { Trophy as TrophyIcon, ZoomIn, ZoomOut, Maximize2, Gamepad2, Crown, Star
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { usePsnData, type Profile } from '../context/PsnDataContext';
 import type { Trophy } from '../data/mockData';
-import { imageCache } from '../services/imageCache';
+import { handleImageError, handleImageLoad } from '../utils/imageRetry';
 
 
 interface OverlaySettings {
@@ -41,27 +41,6 @@ interface CenterCanvasProps {
 
 type ProfileStatType = 'none' | 'rarest' | 'topPlatform' | 'avgRarity';
 
-/**
- * When an image loads successfully, queue it for background preloading
- * through the server proxy so it's cached as a data URL for export.
- */
-function handleImageLoad(_e: React.SyntheticEvent<HTMLImageElement>, originalSrc: string) {
-  if (!originalSrc || originalSrc.startsWith('data:')) return;
-  imageCache.enqueuePreload(originalSrc);
-}
-
-/** On error: try proxy, then direct CDN, then give up. */
-function handleImageError(e: React.SyntheticEvent<HTMLImageElement>, originalSrc: string) {
-  const img = e.currentTarget;
-  const attempt = Number(img.dataset.retryAttempt || '0');
-  if (attempt === 0) {
-    img.dataset.retryAttempt = '1';
-    img.src = `/api/image-proxy?url=${encodeURIComponent(originalSrc)}&t=${Date.now()}`;
-  } else if (attempt === 1) {
-    img.dataset.retryAttempt = '2';
-    img.src = originalSrc;
-  }
-}
 
 function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
   profile: Profile;
