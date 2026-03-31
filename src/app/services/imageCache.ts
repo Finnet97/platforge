@@ -10,6 +10,7 @@ class ImageCacheService {
   private cache = new Map<string, string>();
   private queue: string[] = [];
   private processing = false;
+  private paused = false;
 
   get(url: string): string | undefined {
     return this.cache.get(url);
@@ -51,41 +52,89 @@ class ImageCacheService {
   }
 
   /**
+   * Try to extract a data URL from a loaded DOM image via canvas.
+   * Only works for same-origin images (e.g. loaded via /api/image-proxy).
+   * Cross-origin images will throw a SecurityError — returns null.
+   */
+  extractFromElement(img: HTMLImageElement, originalUrl: string): string | null {
+    if (!img.naturalWidth || !img.naturalHeight) return null;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0);
+      const dataUrl = canvas.toDataURL('image/png');
+      this.set(originalUrl, dataUrl);
+      return dataUrl;
+    } catch {
+      return null; // SecurityError: cross-origin image taints canvas
+    }
+  }
+
+  /**
    * Ensure all given URLs are cached as data URLs before export.
-   * Uses a concurrency pool to fetch missing images in parallel.
+   * Pauses background queue to avoid connection contention on mobile.
+   * Uses a concurrency pool with a retry pass for failures.
    */
   async ensureAllCached(
     urls: string[],
     onProgress?: (done: number, total: number, failed: number) => void,
   ): Promise<{ cached: number; failed: string[] }> {
-    const unique = [...new Set(urls)];
-    const missing = unique.filter(u => u && !u.startsWith('data:') && !this.cache.has(u));
-    const alreadyCached = unique.length - missing.length;
-    const failedUrls: string[] = [];
-    let done = 0;
+    // Pause background queue to free up HTTP connections
+    this.paused = true;
 
-    onProgress?.(alreadyCached, unique.length, 0);
+    try {
+      const unique = [...new Set(urls)];
+      const missing = unique.filter(u => u && !u.startsWith('data:') && !this.cache.has(u));
+      const alreadyCached = unique.length - missing.length;
+      let failedUrls: string[] = [];
+      let done = 0;
 
-    if (missing.length === 0) {
-      return { cached: unique.length, failed: [] };
-    }
+      onProgress?.(alreadyCached, unique.length, 0);
 
-    // Concurrency pool of 5 workers
-    let nextIndex = 0;
-    const workers = Array.from({ length: Math.min(5, missing.length) }, async () => {
-      while (nextIndex < missing.length) {
-        const idx = nextIndex++;
-        const url = missing[idx];
-        const result = await this.preload(url, 3);
-        if (!result) failedUrls.push(url);
-        done++;
-        onProgress?.(alreadyCached + done, unique.length, failedUrls.length);
+      if (missing.length === 0) {
+        return { cached: unique.length, failed: [] };
       }
-    });
 
-    await Promise.all(workers);
+      // First pass: concurrency pool of 3 (mobile-friendly)
+      let nextIndex = 0;
+      const workers = Array.from({ length: Math.min(3, missing.length) }, async () => {
+        while (nextIndex < missing.length) {
+          const idx = nextIndex++;
+          const url = missing[idx];
+          const result = await this.preload(url, 3);
+          if (!result) failedUrls.push(url);
+          done++;
+          onProgress?.(alreadyCached + done, unique.length, failedUrls.length);
+        }
+      });
 
-    return { cached: unique.length - failedUrls.length, failed: failedUrls };
+      await Promise.all(workers);
+
+      // Retry pass: try failed URLs one more time, sequentially
+      if (failedUrls.length > 0) {
+        const stillFailed: string[] = [];
+        for (const url of failedUrls) {
+          await delay(300);
+          const result = await this.preload(url, 2);
+          if (!result) stillFailed.push(url);
+          else {
+            onProgress?.(unique.length - stillFailed.length, unique.length, stillFailed.length);
+          }
+        }
+        failedUrls = stillFailed;
+      }
+
+      return { cached: unique.length - failedUrls.length, failed: failedUrls };
+    } finally {
+      this.paused = false;
+      // Resume background queue if items remain
+      if (this.queue.length > 0 && !this.processing) {
+        this.processQueue();
+      }
+    }
   }
 
   /**
@@ -104,6 +153,12 @@ class ImageCacheService {
     this.processing = true;
 
     while (this.queue.length > 0) {
+      // Wait while export is running to avoid connection contention
+      if (this.paused) {
+        await delay(200);
+        continue;
+      }
+
       const url = this.queue.shift()!;
       if (!this.cache.has(url)) {
         await this.preload(url, 2);

@@ -130,18 +130,34 @@ function AppContent() {
     document.body.appendChild(clone);
 
     try {
-      // 3. Convert images to data URLs on the clone (batches of 5)
-      const imgs = Array.from(clone.querySelectorAll('img'));
-      for (let i = 0; i < imgs.length; i += 5) {
-        const batch = imgs.slice(i, i + 5);
+      // 3. Convert images to data URLs on the clone (batches of 3 for mobile connection limits)
+      const cloneImgs = Array.from(clone.querySelectorAll('img'));
+      const liveImgs = el ? Array.from(el.querySelectorAll('img')) : [];
+
+      for (let i = 0; i < cloneImgs.length; i += 3) {
+        const batch = cloneImgs.slice(i, i + 3);
         await Promise.all(
-          batch.map(async (img) => {
+          batch.map(async (img, batchIdx) => {
             const originalSrc = img.dataset.originalSrc || img.src;
             if (!originalSrc || originalSrc.startsWith('data:')) return;
 
-            // Use cache (populated during preview) or fetch via proxy
-            const cached = imageCache.get(originalSrc);
-            const dataUrl = cached ?? await imageCache.preload(originalSrc, 3);
+            // 1. Check cache (populated during preview or preCacheImages)
+            let dataUrl = imageCache.get(originalSrc);
+
+            // 2. Try canvas extraction from the live DOM image (works for
+            //    same-origin images that loaded via proxy retry)
+            if (!dataUrl) {
+              const liveImg = liveImgs[i + batchIdx];
+              if (liveImg && liveImg.complete && liveImg.naturalWidth > 0) {
+                dataUrl = imageCache.extractFromElement(liveImg, originalSrc) ?? undefined;
+              }
+            }
+
+            // 3. Last resort: fetch via proxy
+            if (!dataUrl) {
+              dataUrl = (await imageCache.preload(originalSrc, 3)) ?? undefined;
+            }
+
             img.src = dataUrl ?? TRANSPARENT_1PX;
             await img.decode().catch(() => {});
           })
