@@ -55,6 +55,16 @@ interface Layout {
   canvasHeight: number;
 }
 
+interface PreloadedIcons {
+  gamepad: HTMLImageElement | null;
+  star: HTMLImageElement | null;
+  starBlack: HTMLImageElement | null;
+  crown: HTMLImageElement | null;
+  crownBlack: HTMLImageElement | null;
+  calendar: HTMLImageElement | null;
+  trophy: HTMLImageElement | null;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -129,116 +139,56 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Icon drawing helpers (approximate Lucide shapes)
+// Icon drawing — exact Lucide SVG paths rendered via Path2D
+// Lucide icons use a 24×24 viewBox with stroke-based rendering.
 // ---------------------------------------------------------------------------
 
-function drawGamepadIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
-  const s = size / 2;
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, size / 8);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  // Body — rounded rect
-  roundRectPath(ctx, cx - s * 0.8, cy - s * 0.45, s * 1.6, s * 0.9, s * 0.25);
-  ctx.stroke();
-  // Left stick
-  ctx.beginPath();
-  ctx.arc(cx - s * 0.35, cy, s * 0.12, 0, Math.PI * 2);
-  ctx.stroke();
-  // Right stick
-  ctx.beginPath();
-  ctx.arc(cx + s * 0.35, cy, s * 0.12, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+/**
+ * Render a Lucide icon by constructing an SVG string, creating an off-screen
+ * image, and drawing it onto the canvas. This ensures pixel-perfect match
+ * with the React preview icons.
+ */
+const iconSvgCache = new Map<string, HTMLImageElement>();
+
+function buildSvg(paths: string, size: number, stroke: string, fill = 'none', strokeWidth = 2): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 }
 
-function drawStarIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
-  const s = size / 2;
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  for (let i = 0; i < 5; i++) {
-    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
-    const outerX = cx + s * Math.cos(angle);
-    const outerY = cy + s * Math.sin(angle);
-    if (i === 0) ctx.moveTo(outerX, outerY);
-    else ctx.lineTo(outerX, outerY);
-    const innerAngle = angle + Math.PI / 5;
-    ctx.lineTo(cx + s * 0.4 * Math.cos(innerAngle), cy + s * 0.4 * Math.sin(innerAngle));
+const LUCIDE_PATHS = {
+  gamepad2: `<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>`,
+  star: `<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>`,
+  crown: `<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>`,
+  calendar: `<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>`,
+  trophy: `<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>`,
+};
+
+async function loadIconImage(
+  name: keyof typeof LUCIDE_PATHS,
+  size: number,
+  color: string,
+  fill = 'none',
+  strokeWidth = 2,
+): Promise<HTMLImageElement | null> {
+  const key = `${name}-${size}-${color}-${fill}-${strokeWidth}`;
+  const cached = iconSvgCache.get(key);
+  if (cached) return cached;
+
+  const svg = buildSvg(LUCIDE_PATHS[name], size, color, fill, strokeWidth);
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    iconSvgCache.set(key, img);
+    return img;
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
   }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
 }
 
-function drawCrownIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
-  const s = size / 2;
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.7, cy + s * 0.5);
-  ctx.lineTo(cx - s * 0.7, cy - s * 0.1);
-  ctx.lineTo(cx - s * 0.35, cy + s * 0.15);
-  ctx.lineTo(cx, cy - s * 0.5);
-  ctx.lineTo(cx + s * 0.35, cy + s * 0.15);
-  ctx.lineTo(cx + s * 0.7, cy - s * 0.1);
-  ctx.lineTo(cx + s * 0.7, cy + s * 0.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawCalendarIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
-  const s = size / 2;
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, size / 8);
-  ctx.lineCap = 'round';
-  roundRectPath(ctx, cx - s * 0.7, cy - s * 0.5, s * 1.4, s * 1.2, s * 0.15);
-  ctx.stroke();
-  // Top pegs
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.3, cy - s * 0.7);
-  ctx.lineTo(cx - s * 0.3, cy - s * 0.4);
-  ctx.moveTo(cx + s * 0.3, cy - s * 0.7);
-  ctx.lineTo(cx + s * 0.3, cy - s * 0.4);
-  ctx.stroke();
-  // Horizontal line
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.7, cy - s * 0.15);
-  ctx.lineTo(cx + s * 0.7, cy - s * 0.15);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawTrophyIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
-  const s = size / 2;
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = Math.max(1, size / 8);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  // Cup body
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.4, cy - s * 0.6);
-  ctx.lineTo(cx - s * 0.35, cy + s * 0.05);
-  ctx.quadraticCurveTo(cx, cy + s * 0.3, cx + s * 0.35, cy + s * 0.05);
-  ctx.lineTo(cx + s * 0.4, cy - s * 0.6);
-  ctx.stroke();
-  // Base
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.3, cy + s * 0.6);
-  ctx.lineTo(cx + s * 0.3, cy + s * 0.6);
-  ctx.stroke();
-  // Stem
-  ctx.beginPath();
-  ctx.moveTo(cx, cy + s * 0.25);
-  ctx.lineTo(cx, cy + s * 0.6);
-  ctx.stroke();
-  ctx.restore();
-}
 
 // ---------------------------------------------------------------------------
 // Badge drawing
@@ -256,16 +206,15 @@ function drawBadgePill(
     padX: number;
     padY: number;
     align: 'left' | 'right';
-    icon?: (ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) => void;
+    iconImg?: HTMLImageElement | null;
     iconSize?: number;
-    iconColor?: string;
   },
 ) {
   ctx.save();
   ctx.font = opts.font;
   const metrics = ctx.measureText(text);
   const textW = metrics.width;
-  const iconW = opts.icon ? (opts.iconSize ?? 10) + 3 : 0;
+  const iconW = opts.iconImg ? (opts.iconSize ?? 10) + 3 : 0;
   const totalW = opts.padX * 2 + textW + iconW;
   const fontSizeMatch = opts.font.match(/(\d+)px/);
   const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1]) : 12;
@@ -291,9 +240,9 @@ function drawBadgePill(
 
   // Icon
   let textX = bx + opts.padX;
-  if (opts.icon) {
+  if (opts.iconImg) {
     const iconS = opts.iconSize ?? 10;
-    opts.icon(ctx, textX + iconS / 2, by + height / 2, iconS, opts.iconColor ?? opts.textColor);
+    ctx.drawImage(opts.iconImg, textX, by + (height - iconS) / 2, iconS, iconS);
     textX += iconS + 3;
   }
 
@@ -424,6 +373,7 @@ function drawTile(
   params: CanvasExportParams,
   imageMap: Map<string, HTMLImageElement>,
   rarestId: number | null,
+  icons: PreloadedIcons,
 ) {
   const { borderRadius, showBorders, showGlassmorphism, showRarityHeatmap, overlays } = params;
   const radius = (borderRadius / 100) * tileSize;
@@ -530,7 +480,7 @@ function drawTile(
     ctx.lineWidth = 1;
     roundRectPath(ctx, bx, by, ov.badgeSize, ov.badgeSize, ov.badgeSize / 2);
     ctx.stroke();
-    drawGamepadIcon(ctx, bx + ov.badgeSize / 2, by + ov.badgeSize / 2, ov.iconSize, '#FFD700');
+    if (icons.gamepad) ctx.drawImage(icons.gamepad, bx + (ov.badgeSize - ov.iconSize) / 2, by + (ov.badgeSize - ov.iconSize) / 2, ov.iconSize, ov.iconSize);
     ctx.restore();
   }
 
@@ -576,9 +526,8 @@ function drawTile(
       padX: ov.padX,
       padY: ov.padY,
       align: 'left',
-      icon: drawCalendarIcon,
+      iconImg: icons.calendar,
       iconSize: ov.calIcon,
-      iconColor: '#8A9BB8',
     });
   }
 
@@ -598,7 +547,8 @@ function drawTile(
       roundRectPath(ctx, mX, mY, ov.badgeSizeSm, ov.badgeSizeSm, ov.badgeSizeSm / 2);
       ctx.stroke();
     }
-    drawStarIcon(ctx, mX + ov.badgeSizeSm / 2, mY + ov.badgeSizeSm / 2, ov.iconSizeSm, isGold ? '#000000' : '#FFD700');
+    const starImg = isGold ? icons.starBlack : icons.star;
+    if (starImg) ctx.drawImage(starImg, mX + (ov.badgeSizeSm - ov.iconSizeSm) / 2, mY + (ov.badgeSizeSm - ov.iconSizeSm) / 2, ov.iconSizeSm, ov.iconSizeSm);
     ctx.restore();
   }
 
@@ -615,7 +565,7 @@ function drawTile(
     ctx.arc(bx + ov.badgeSize / 2, by + ov.badgeSize / 2, ov.badgeSize / 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    drawCrownIcon(ctx, bx + ov.badgeSize / 2, by + ov.badgeSize / 2, ov.iconSize, '#000000');
+    if (icons.crownBlack) ctx.drawImage(icons.crownBlack, bx + (ov.badgeSize - ov.iconSize) / 2, by + (ov.badgeSize - ov.iconSize) / 2, ov.iconSize, ov.iconSize);
   }
 }
 
@@ -628,6 +578,7 @@ function drawProfileCard(
   layout: Layout,
   params: CanvasExportParams,
   avatarImg: HTMLImageElement | null,
+  icons: PreloadedIcons,
 ) {
   const { profile, profileStat, trophies } = params;
   const cardY = layout.profileCardY;
@@ -744,7 +695,7 @@ function drawProfileCard(
   const platCenterX = curX + platBlockW / 2;
 
   // Trophy icon
-  drawTrophyIcon(ctx, platCenterX, centerY - 20, 16, '#FFD700');
+  if (icons.trophy) ctx.drawImage(icons.trophy, platCenterX - 8, centerY - 28, 16, 16);
 
   // Number
   ctx.save();
@@ -773,7 +724,7 @@ function drawProfileCard(
     const extraCenterX = curX + 12 + 1 + 12 + (extraBlockW - 25) / 2;
 
     // Star icon
-    drawStarIcon(ctx, extraCenterX, centerY - 20, 14, '#FFD700');
+    if (icons.star) ctx.drawImage(icons.star, extraCenterX - 7, centerY - 27, 14, 14);
 
     // Value
     ctx.save();
@@ -827,6 +778,19 @@ export async function renderMosaicToCanvas(params: CanvasExportParams): Promise<
   });
   await Promise.all(loadPromises);
 
+  // 3b. Preload Lucide icons as SVG images
+  const iconSize = 48; // render at high res, will be scaled down when drawn
+  const [gamepad, star, starBlack, crown, crownBlack, calendar, trophy] = await Promise.all([
+    loadIconImage('gamepad2', iconSize, '#FFD700'),
+    loadIconImage('star', iconSize, '#FFD700', 'none', 2.5),
+    loadIconImage('star', iconSize, '#000000', 'none', 2.5),
+    loadIconImage('crown', iconSize, '#FFD700'),
+    loadIconImage('crown', iconSize, '#000000'),
+    loadIconImage('calendar', iconSize, '#8A9BB8'),
+    loadIconImage('trophy', iconSize, '#FFD700', 'none', 2.5),
+  ]);
+  const icons: PreloadedIcons = { gamepad, star, starBlack, crown, crownBlack, calendar, trophy };
+
   // 4. Create canvas
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(layout.canvasWidth * params.pixelRatio);
@@ -843,13 +807,13 @@ export async function renderMosaicToCanvas(params: CanvasExportParams): Promise<
     const trophy = params.trophies[i];
     const pos = layout.tiles[i];
     if (!pos) break;
-    drawTile(ctx, trophy, pos.x, pos.y, layout.tileSize, params, imageMap, rarestId);
+    drawTile(ctx, trophy, pos.x, pos.y, layout.tileSize, params, imageMap, rarestId, icons);
   }
 
   // 7. Draw profile card
   if (params.showProfile) {
     const avatarImg = imageMap.get(params.profile.avatar) ?? null;
-    drawProfileCard(ctx, layout, params, avatarImg);
+    drawProfileCard(ctx, layout, params, avatarImg, icons);
   }
 
   return canvas;
