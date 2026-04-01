@@ -52,28 +52,6 @@ class ImageCacheService {
   }
 
   /**
-   * Try to extract a data URL from a loaded DOM image via canvas.
-   * Only works for same-origin images (e.g. loaded via /api/image-proxy).
-   * Cross-origin images will throw a SecurityError — returns null.
-   */
-  extractFromElement(img: HTMLImageElement, originalUrl: string): string | null {
-    if (!img.naturalWidth || !img.naturalHeight) return null;
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
-      ctx.drawImage(img, 0, 0);
-      const dataUrl = canvas.toDataURL('image/png');
-      this.set(originalUrl, dataUrl);
-      return dataUrl;
-    } catch {
-      return null; // SecurityError: cross-origin image taints canvas
-    }
-  }
-
-  /**
    * Ensure all given URLs are cached as data URLs before export.
    * Pauses background queue to avoid connection contention on mobile.
    * Uses a concurrency pool with a retry pass for failures.

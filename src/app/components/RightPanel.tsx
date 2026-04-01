@@ -75,7 +75,6 @@ function DraggableTile({ trophy, index, isSelected, onSelect, onMove }: Draggabl
       </div>
       <img
         src={trophy.imageUrl}
-        data-original-src={trophy.imageUrl}
         alt={trophy.gameTitle}
         className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-[#1E2740]"
         onLoad={(e) => handleImageLoad(e, trophy.imageUrl)}
@@ -131,7 +130,6 @@ export function TrophyDetailContent({ selectedTrophy, totalPlatinums }: TrophyDe
         <div className="relative h-40 overflow-hidden">
           <img
             src={selectedTrophy.imageUrl}
-            data-original-src={selectedTrophy.imageUrl}
             alt={selectedTrophy.gameTitle}
             className="w-full h-full object-cover"
             onLoad={(e) => handleImageLoad(e, selectedTrophy.imageUrl)}

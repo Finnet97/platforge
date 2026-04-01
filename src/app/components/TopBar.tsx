@@ -104,11 +104,11 @@ export function TopBar({ onShowAuth, onExport, onShare, isMobile, onOpenSettings
                   </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-[#1E2740]" />
                   <DropdownMenu.Item
-                    className="px-3 py-2 text-sm text-[#8A9BB8] rounded hover:bg-[#1E2740] cursor-pointer outline-none flex items-center gap-2"
+                    className="px-3 py-2 text-sm text-[#FF6B9D] rounded hover:bg-[#FF6B9D]/10 cursor-pointer outline-none flex items-center gap-2"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                     onSelect={() => window.open('/support', '_blank')}
                   >
-                    <Heart className="w-3.5 h-3.5" />
+                    <Heart className="w-3.5 h-3.5" fill="currentColor" />
                     Support
                   </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-[#1E2740]" />
@@ -255,11 +255,11 @@ export function TopBar({ onShowAuth, onExport, onShare, isMobile, onOpenSettings
           {/* Support */}
           <button
             onClick={() => window.open('/support', '_blank')}
-            className="h-9 px-3 bg-[#12172A] border border-[#1E2740] text-[#8A9BB8] text-sm rounded-lg hover:border-[#FFD700] hover:text-[#FFD700] transition-colors flex items-center gap-1.5"
+            className="h-9 px-3 bg-[#2A1225] border border-[#FF6B9D]/30 text-[#FF6B9D] text-sm rounded-lg hover:border-[#FF6B9D] hover:bg-[#FF6B9D]/10 transition-colors flex items-center gap-1.5 group"
             style={{ fontFamily: 'Inter, sans-serif' }}
             title="Support PlatForge"
           >
-            <Heart className="w-3.5 h-3.5" />
+            <Heart className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" fill="currentColor" />
             Support
           </button>
 

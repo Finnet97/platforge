@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Trophy as TrophyIcon, ZoomIn, ZoomOut, Maximize2, Gamepad2, Crown, Star, Calendar } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { usePsnData, type Profile } from '../context/PsnDataContext';
@@ -33,7 +33,6 @@ interface CenterCanvasProps {
   useTrophyImage: boolean;
   selectedTile: number | null;
   onSelectTile: (index: number) => void;
-  onMosaicRef?: (el: HTMLDivElement | null) => void;
   isMobile?: boolean;
   tileSize?: number;
   onTileTap?: (index: number) => void;
@@ -74,8 +73,6 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
         <div className="flex items-center gap-2">
           <img
             src={profile.avatar}
-            data-original-src={profile.avatar}
-            data-avatar-img=""
             alt={profile.username}
             className="w-8 h-8 rounded-full object-cover flex-shrink-0"
             style={{
@@ -133,8 +130,6 @@ function ProfileCard({ profile, profileStat, processedTrophies, isMobile }: {
       <div className="flex items-center gap-3">
         <img
           src={profile.avatar}
-          data-original-src={profile.avatar}
-          data-avatar-img=""
           alt={profile.username}
           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
           style={{
@@ -203,7 +198,6 @@ export function CenterCanvas({
   useTrophyImage,
   selectedTile,
   onSelectTile,
-  onMosaicRef,
   isMobile,
   tileSize,
   onTileTap
@@ -214,10 +208,6 @@ export function CenterCanvas({
   const mosaicRef = useRef<HTMLDivElement>(null);
 
   const effectiveTileSize = tileSize ?? 128;
-
-  useEffect(() => {
-    onMosaicRef?.(mosaicRef.current);
-  }, [onMosaicRef]);
 
   const totalTiles = gridSize.rows * gridSize.cols;
   const displayTrophies = processedTrophies.slice(0, totalTiles);
@@ -273,7 +263,6 @@ export function CenterCanvas({
         {/* Trophy Image */}
         <img
           src={rawSrc}
-          data-original-src={rawSrc}
           alt={trophy.gameTitle}
           className="w-full h-full object-cover"
           onLoad={(e) => handleImageLoad(e, rawSrc)}

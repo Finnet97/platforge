@@ -55,7 +55,6 @@ function AppContent() {
   const [profileStat, setProfileStat] = useState<'none' | 'rarest' | 'topPlatform' | 'avgRarity'>('rarest');
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
-  const mosaicRef = useRef<HTMLDivElement | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const mobileTileSize = useMemo(() => {
@@ -304,7 +303,6 @@ function AppContent() {
             useTrophyImage={useTrophyImage}
             selectedTile={selectedTile}
             onSelectTile={setSelectedTile}
-            onMosaicRef={(el) => { mosaicRef.current = el; }}
             isMobile={true}
             tileSize={mobileTileSize}
             onTileTap={handleTileTap}
@@ -419,7 +417,6 @@ function AppContent() {
             useTrophyImage={useTrophyImage}
             selectedTile={selectedTile}
             onSelectTile={setSelectedTile}
-            onMosaicRef={(el) => { mosaicRef.current = el; }}
           />
 
           <RightPanel
