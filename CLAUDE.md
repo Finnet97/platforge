@@ -72,7 +72,7 @@ Standalone page at `/support` with project description, donation links (MercadoP
 
 **Grid sizes:** Presets 3×3 through 10×10 (`[3,4,5,6,7,8,10]`) plus "Auto" button with best-fit algorithm that finds the most compact rectangular grid (not necessarily square) for the trophy count, preferring squarish shapes. Grid uses fixed-size columns (`gridTemplateColumns: repeat(cols, ${tileSize}px)`) — not `1fr` — so tiles are always perfectly aligned. Desktop tile size is 128px; on mobile, tile size is computed responsively: `Math.floor((viewportWidth - padding - gaps) / cols)` with a 48px minimum. When the last row has fewer tiles than columns, it renders as a centered flexbox row instead of left-aligned grid cells. The mosaic wrapper uses `inline-flex flex-col` to shrink-wrap its content.
 
-**Image export:** `exportMosaicAsBlob()` in `src/app/services/canvasExport.ts` renders the mosaic directly to a Canvas 2D element — no DOM capture library is used. The renderer draws background, trophy tiles (with `object-fit: cover` via aspect-ratio math), overlay badges, icons (exact Lucide SVG paths rendered as images), and the profile card. All images are pre-cached as data URLs via `imageCache.ensureAllCached()` before rendering. Export always uses 128px tiles at `pixelRatio: 2` for high-res output. Used by both Export (download) and Share (Web Share API / clipboard). A toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for export/share results including errors.
+**Image export:** `exportMosaicAsBlob()` in `src/app/services/canvasExport.ts` renders the mosaic directly to a Canvas 2D element — no DOM capture library is used. The renderer draws background, trophy tiles (with `object-fit: cover` via aspect-ratio math), overlay badges, icons (exact Lucide SVG paths rendered as images), and the profile card. All images are pre-cached as data URLs via `imageCache.ensureAllCached()` before rendering. Export uses adaptive tile sizing targeting ~1080px logical width (clamped 64–256px per tile), with `pixelRatio: 2` for high-res output. Padding, spacing, and profile card scale proportionally with tile size (`scale = tileSize / 128`). The profile card auto-shrinks if it would exceed canvas width. Pattern background uses `createPattern()` with radial gradient to match the CSS preview. Used by both Export (download) and Share (Web Share API with `text: 'PlatForge: https://platforge.co/'` / clipboard). A toast notification system (`toastMessage` state + 3s auto-dismiss) provides feedback for export/share results including errors.
 
 **Tile overlay scaling:** Badge overlays (order number, rarity, platform icon, date, milestones, rarest badge) use a proportional scaling system (`ov` object in CenterCanvas.tsx and replicated in canvasExport.ts) based on `effectiveTileSize / 128`. All overlay sizes, positions, fonts, and icons scale linearly with tile size. Overlays use `bg-black/75` (solid) instead of `backdrop-blur-sm`.
 
@@ -223,6 +223,71 @@ Legacy endpoints (`/api/auth/login`, `/api/auth/verify-2fa`, `/api/auth/cancel-2
 - `vite-plugin-compression` generates gzip + brotli pre-compressed assets
 - Modals are lazy-loaded via `React.lazy()` (code-split into separate chunks)
 - Asset hashing enabled for cache busting
+
+## Image Loading & Export Pipeline
+
+PSN CDN images are cross-origin and rate-limited. The system uses a multi-stage pipeline to load images in the browser, cache them as data URLs, and render them to canvas for export.
+
+### Stage 1: Browser Image Loading (`imageRetry.ts`)
+
+Every `<img>` in the mosaic uses shared `onLoad`/`onError` handlers:
+
+- **Initial load:** Browser fetches directly from PSN CDN URL (set as `src`)
+- **On error (attempt 1–2):** Retries via server proxy (`/api/image-proxy?url=...&t=cacheBust`)
+- **On success:** Queues the original URL for background preloading via `imageCache.enqueuePreload(url)`
+
+### Stage 2: Server Image Proxy (`server/index.ts`)
+
+`GET /api/image-proxy?url=...` proxies PSN CDN images to bypass CORS restrictions:
+
+- **Domain whitelist:** Only `playstation.net`, `playstation.com`, `sonyentertainmentnetwork.com`, `googleapis.com`, `ggpht.com`
+- **Browser-like headers:** Sends `User-Agent`, `Accept`, `Referer`, `Sec-Fetch-*` headers to avoid CDN rejection
+- **Retry with backoff:** Up to 3 attempts with [0, 500, 1500]ms delays. Skips retry on 4xx (permanent failure)
+- **Timeout:** 15s per attempt via `AbortController`
+- **Rate limit:** 300 req/15min (separate from general API limit)
+- **Caching:** Sets `Cache-Control: public, max-age=86400` on successful responses
+- **Protocol upgrade:** Automatically upgrades `http:` URLs to `https:`
+
+### Stage 3: Background Preload Queue (`imageCache.ts`)
+
+`ImageCacheService` is a singleton that caches original CDN URLs → base64 data URLs:
+
+- **`enqueuePreload(url)`:** Adds URL to a FIFO queue. Processes one at a time with 150ms delays between requests to avoid PSN rate limiting
+- **`preload(url, retries)`:** Fetches through proxy, converts blob to data URL via `FileReader`, stores in Map. Retries up to 3 times with exponential backoff (400ms × attempt)
+- **Max capacity:** 500 entries (LRU eviction when full)
+- **Pause/resume:** Queue pauses automatically during export (`ensureAllCached`) to avoid HTTP connection contention on mobile, resumes after export completes
+
+### Stage 4: Pre-Export Caching (`imageCache.ensureAllCached`)
+
+Called before export/share to ensure all visible tile images are cached:
+
+1. Filters unique, non-cached URLs from the trophy list
+2. **First pass:** Concurrency pool of 3 workers (mobile-friendly) with progress callback
+3. **Retry pass:** Failed URLs retried sequentially with 300ms delays
+4. Returns `{ cached, failed }` counts
+
+### Stage 5: Canvas 2D Export (`canvasExport.ts`)
+
+`exportMosaicAsBlob(params)` renders the mosaic directly to a `<canvas>` element — no DOM capture:
+
+1. **Layout computation:** Pure function calculates tile positions with last-row centering
+2. **Font loading:** `document.fonts.load()` for Inter, Rajdhani, Orbitron + `document.fonts.ready`
+3. **Image preloading:** Reads data URLs from `imageCache.get(url)`, creates `HTMLImageElement` via `img.decode()`
+4. **Drawing sequence:** Background → tiles (image + glassmorphism + borders + overlay badges) → profile card
+5. **Icons:** Exact Lucide SVG paths (`LUCIDE_PATHS` map) rendered as SVG images via blob URLs, cached in a Map
+6. **Output:** `canvas.toBlob()` at `pixelRatio: 2` with adaptive tile sizing (~1080px target width, 64–256px tile clamp)
+
+**Why Canvas 2D instead of DOM capture:** `html-to-image` uses SVG `<foreignObject>` serialization which has fundamental WebKit bugs on mobile Safari — images randomly fail to render even as data URLs. Direct canvas drawing bypasses all serialization issues.
+
+### File Map
+
+| File | Role |
+|------|------|
+| `src/app/utils/imageRetry.ts` | Browser `onLoad`/`onError` handlers with proxy retry chain |
+| `src/app/services/imageCache.ts` | Singleton data URL cache with background preload queue |
+| `src/app/services/canvasExport.ts` | Canvas 2D mosaic renderer (layout, drawing, export) |
+| `server/index.ts` (image-proxy route) | Server-side proxy with domain whitelist, browser headers, retry |
+| `src/app/App.tsx` (`preCacheImages`, `handleExport`, `handleShare`) | Orchestrates pre-cache → render → download/share |
 
 ## Known Constraints
 

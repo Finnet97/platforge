@@ -209,7 +209,7 @@ function AppContent() {
       // Try native Web Share API with file support
       if (navigator.canShare?.({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], title: 'PlatForge' });
+          await navigator.share({ files: [file], title: 'PlatForge', text: 'PlatForge: https://platforge.co/' });
           return;
         } catch (err) {
           // User cancelled share — not an error

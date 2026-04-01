@@ -69,10 +69,13 @@ interface PreloadedIcons {
 // Constants
 // ---------------------------------------------------------------------------
 
-const TILE_SIZE = 128;
-const PADDING = 32;
-const PROFILE_CARD_HEIGHT_DESKTOP = 80;
-const PROFILE_CARD_MARGIN_TOP = 32;
+const BASE_TILE_SIZE = 128;
+const BASE_PADDING = 32;
+const BASE_PROFILE_CARD_HEIGHT = 80;
+const BASE_PROFILE_CARD_MARGIN_TOP = 32;
+const TARGET_WIDTH = 1080;
+const MIN_TILE = 64;
+const MAX_TILE = 256;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -262,12 +265,19 @@ function drawBadgePill(
 
 function computeLayout(params: CanvasExportParams): Layout {
   const { trophies, gridSize, spacing } = params;
-  const tileSize = TILE_SIZE;
-  const padding = PADDING;
   const cols = gridSize.cols;
   const count = trophies.length;
 
-  const gridWidth = cols * tileSize + (cols - 1) * spacing;
+  // Dynamic tile size targeting ~1080px logical width
+  const rawTile = Math.floor((TARGET_WIDTH - 2 * BASE_PADDING - (cols - 1) * spacing) / cols);
+  const tileSize = Math.max(MIN_TILE, Math.min(MAX_TILE, rawTile));
+
+  // Scale padding and spacing proportionally
+  const scale = tileSize / BASE_TILE_SIZE;
+  const padding = Math.round(BASE_PADDING * scale);
+  const scaledSpacing = Math.round(spacing * scale);
+
+  const gridWidth = cols * tileSize + (cols - 1) * scaledSpacing;
 
   // Compute tile positions
   const tiles: TilePos[] = [];
@@ -278,33 +288,35 @@ function computeLayout(params: CanvasExportParams): Layout {
     const row = Math.floor(i / cols);
     const col = i % cols;
     tiles.push({
-      x: padding + col * (tileSize + spacing),
-      y: padding + row * (tileSize + spacing),
+      x: padding + col * (tileSize + scaledSpacing),
+      y: padding + row * (tileSize + scaledSpacing),
     });
   }
 
   // Last incomplete row — centered
   if (lastRowCount > 0) {
-    const lastRowWidth = lastRowCount * tileSize + (lastRowCount - 1) * spacing;
+    const lastRowWidth = lastRowCount * tileSize + (lastRowCount - 1) * scaledSpacing;
     const offsetX = padding + (gridWidth - lastRowWidth) / 2;
-    const rowY = padding + fullRows * (tileSize + spacing);
+    const rowY = padding + fullRows * (tileSize + scaledSpacing);
     for (let i = 0; i < lastRowCount; i++) {
       tiles.push({
-        x: offsetX + i * (tileSize + spacing),
+        x: offsetX + i * (tileSize + scaledSpacing),
         y: rowY,
       });
     }
   }
 
   const totalRows = lastRowCount > 0 ? fullRows + 1 : fullRows;
-  const gridHeight = totalRows * tileSize + (totalRows - 1) * spacing;
+  const gridHeight = totalRows * tileSize + (totalRows - 1) * scaledSpacing;
 
-  // Profile card
+  // Profile card (scaled)
+  const profileMarginTop = Math.round(BASE_PROFILE_CARD_MARGIN_TOP * scale);
+  const profileCardHeight = Math.round(BASE_PROFILE_CARD_HEIGHT * scale);
   let profileCardY = 0;
   let profileHeight = 0;
   if (params.showProfile) {
-    profileCardY = padding + gridHeight + PROFILE_CARD_MARGIN_TOP;
-    profileHeight = PROFILE_CARD_HEIGHT_DESKTOP + PROFILE_CARD_MARGIN_TOP;
+    profileCardY = padding + gridHeight + profileMarginTop;
+    profileHeight = profileCardHeight + profileMarginTop;
   }
 
   const canvasWidth = padding * 2 + gridWidth;
@@ -341,14 +353,21 @@ function drawBackground(
   } else if (bgType === 'pattern') {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    for (let py = 0; py < h; py += 16) {
-      for (let px = 0; px < w; px += 16) {
-        ctx.beginPath();
-        ctx.arc(px, py, 1, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    // Match CSS: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px) / 16px 16px
+    const patSize = 16;
+    const patCanvas = document.createElement('canvas');
+    patCanvas.width = patSize;
+    patCanvas.height = patSize;
+    const pctx = patCanvas.getContext('2d')!;
+    const grad = pctx.createRadialGradient(0, 0, 0, 0, 0, 1.5);
+    grad.addColorStop(0, 'rgba(255,255,255,0.1)');
+    grad.addColorStop(0.67, 'rgba(255,255,255,0.1)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    pctx.fillStyle = grad;
+    pctx.fillRect(0, 0, patSize, patSize);
+    const pattern = ctx.createPattern(patCanvas, 'repeat')!;
+    ctx.fillStyle = pattern;
+    ctx.fillRect(0, 0, w, h);
   } else if (bgType === 'transparent') {
     // For JPEG, fill with fallback; for PNG, leave transparent (handled at canvas level)
     if (params.format === 'jpeg') {
@@ -573,6 +592,57 @@ function drawTile(
 // Drawing: profile card
 // ---------------------------------------------------------------------------
 
+/** Compute the best scale for the profile card so it fits within maxWidth. */
+function computeCardScale(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  profile: Profile,
+  extraStat: { value: string; label: string } | null,
+  maxWidth: number,
+): number {
+  const tileScale = layout.tileSize / BASE_TILE_SIZE;
+
+  // Measure card width at the tile scale
+  function measureCardWidth(s: number): number {
+    const fLg = Math.round(18 * s);
+    const fMd = Math.round(12 * s);
+    const fSm = Math.round(10 * s);
+
+    ctx.font = `700 ${fLg}px Rajdhani, sans-serif`;
+    const usernameW = ctx.measureText(profile.username).width;
+    ctx.font = `500 ${fMd}px Inter, sans-serif`;
+    const levelW = ctx.measureText(`Lv ${profile.psnLevel}`).width;
+    const nameBlockW = Math.max(usernameW, levelW);
+
+    ctx.font = `700 ${fLg}px Rajdhani, sans-serif`;
+    const platNumW = ctx.measureText(String(profile.totalPlatinums)).width;
+    ctx.font = `500 ${fSm}px Inter, sans-serif`;
+    const platLabelW = ctx.measureText('Platinums').width;
+    const platBlockW = Math.max(platNumW, platLabelW, Math.round(64 * s));
+
+    let extraBlockW = 0;
+    if (extraStat) {
+      ctx.font = `700 ${fLg}px Rajdhani, sans-serif`;
+      const valW = ctx.measureText(extraStat.value).width;
+      ctx.font = `500 ${fSm}px Inter, sans-serif`;
+      const labW = ctx.measureText(extraStat.label).width;
+      extraBlockW = Math.max(valW, labW, Math.round(64 * s)) + Math.round(24 * s) + 1;
+    }
+
+    const avatarSize = Math.round(48 * s);
+    const avatarGap = Math.round(12 * s);
+    const sectionGap = Math.round(24 * s);
+    const padH = Math.round(20 * s);
+    return padH * 2 + avatarSize + avatarGap + nameBlockW + sectionGap + 1 + sectionGap + platBlockW + extraBlockW;
+  }
+
+  const naturalW = measureCardWidth(tileScale);
+  if (naturalW <= maxWidth) return tileScale;
+
+  // Shrink proportionally to fit
+  return tileScale * (maxWidth / naturalW);
+}
+
 function drawProfileCard(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
@@ -597,46 +667,56 @@ function drawProfileCard(
     extraStat = { value: `${avg.toFixed(1)}%`, label: 'Avg Rarity' };
   }
 
+  // --- Compute card scale that fits within canvas width ---
+  // Start with tile scale, then shrink if the card would overflow
+  const maxCardW = layout.canvasWidth - layout.padding * 2;
+  const s = computeCardScale(ctx, layout, profile, extraStat, maxCardW);
+
+  // Scaled font sizes
+  const fontLg = Math.round(18 * s);
+  const fontMd = Math.round(12 * s);
+  const fontSm = Math.round(10 * s);
+
   // --- Measure text to compute card width ---
-  ctx.font = '700 18px Rajdhani, sans-serif';
+  ctx.font = `700 ${fontLg}px Rajdhani, sans-serif`;
   const usernameW = ctx.measureText(profile.username).width;
-  ctx.font = '500 12px Inter, sans-serif';
+  ctx.font = `500 ${fontMd}px Inter, sans-serif`;
   const levelW = ctx.measureText(`Lv ${profile.psnLevel}`).width;
   const nameBlockW = Math.max(usernameW, levelW);
 
-  ctx.font = '700 18px Rajdhani, sans-serif';
+  ctx.font = `700 ${fontLg}px Rajdhani, sans-serif`;
   const platNumW = ctx.measureText(String(profile.totalPlatinums)).width;
-  ctx.font = '500 10px Inter, sans-serif';
+  ctx.font = `500 ${fontSm}px Inter, sans-serif`;
   const platLabelW = ctx.measureText('Platinums').width;
-  const platBlockW = Math.max(platNumW, platLabelW, 64);
+  const platBlockW = Math.max(platNumW, platLabelW, Math.round(64 * s));
 
   let extraBlockW = 0;
   if (extraStat) {
-    ctx.font = '700 18px Rajdhani, sans-serif';
+    ctx.font = `700 ${fontLg}px Rajdhani, sans-serif`;
     const valW = ctx.measureText(extraStat.value).width;
-    ctx.font = '500 10px Inter, sans-serif';
+    ctx.font = `500 ${fontSm}px Inter, sans-serif`;
     const labW = ctx.measureText(extraStat.label).width;
-    extraBlockW = Math.max(valW, labW, 64) + 24 + 1; // gap + separator
+    extraBlockW = Math.max(valW, labW, Math.round(64 * s)) + Math.round(24 * s) + 1;
   }
 
-  const avatarSize = 48;
-  const avatarGap = 12;
-  const sectionGap = 24;
-  const padH = 20;
+  const avatarSize = Math.round(48 * s);
+  const avatarGap = Math.round(12 * s);
+  const sectionGap = Math.round(24 * s);
+  const padH = Math.round(20 * s);
   const sepW = 1;
 
   const cardW = padH * 2 + avatarSize + avatarGap + nameBlockW + sectionGap + sepW + sectionGap + platBlockW + extraBlockW;
-  const cardH = PROFILE_CARD_HEIGHT_DESKTOP;
+  const cardH = Math.round(BASE_PROFILE_CARD_HEIGHT * s);
   const cardX = (layout.canvasWidth - cardW) / 2;
 
   // --- Background ---
   ctx.save();
   ctx.fillStyle = '#12172A';
-  roundRectPath(ctx, cardX, cardY, cardW, cardH, 12);
+  roundRectPath(ctx, cardX, cardY, cardW, cardH, Math.round(12 * s));
   ctx.fill();
   ctx.strokeStyle = '#1E2740';
   ctx.lineWidth = 1;
-  roundRectPath(ctx, cardX, cardY, cardW, cardH, 12);
+  roundRectPath(ctx, cardX, cardY, cardW, cardH, Math.round(12 * s));
   ctx.stroke();
   ctx.restore();
 
@@ -669,17 +749,17 @@ function drawProfileCard(
   // --- Username + Level ---
   ctx.save();
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '700 18px Rajdhani, sans-serif';
+  ctx.font = `700 ${fontLg}px Rajdhani, sans-serif`;
   ctx.textBaseline = 'bottom';
   ctx.fillText(profile.username, curX, centerY + 1);
-  ctx.font = '500 12px Inter, sans-serif';
+  ctx.font = `500 ${fontMd}px Inter, sans-serif`;
   ctx.fillStyle = '#8A9BB8';
   ctx.textBaseline = 'top';
-  ctx.fillText('Lv ', curX, centerY + 3);
+  ctx.fillText('Lv ', curX, centerY + Math.round(3 * s));
   const lvPrefixW = ctx.measureText('Lv ').width;
   ctx.fillStyle = '#FFD700';
-  ctx.font = '700 12px Rajdhani, sans-serif';
-  ctx.fillText(String(profile.psnLevel), curX + lvPrefixW, centerY + 3);
+  ctx.font = `700 ${fontMd}px Rajdhani, sans-serif`;
+  ctx.fillText(String(profile.psnLevel), curX + lvPrefixW, centerY + Math.round(3 * s));
   ctx.restore();
 
   curX += nameBlockW + sectionGap;
@@ -687,28 +767,29 @@ function drawProfileCard(
   // --- Separator ---
   ctx.save();
   ctx.fillStyle = '#1E2740';
-  ctx.fillRect(curX, cardY + 12, 1, cardH - 24);
+  ctx.fillRect(curX, cardY + Math.round(12 * s), 1, cardH - Math.round(24 * s));
   ctx.restore();
   curX += 1 + sectionGap;
 
   // --- Platinums section ---
   const platCenterX = curX + platBlockW / 2;
+  const iconSz = Math.round(16 * s);
 
   // Trophy icon
-  if (icons.trophy) ctx.drawImage(icons.trophy, platCenterX - 8, centerY - 28, 16, 16);
+  if (icons.trophy) ctx.drawImage(icons.trophy, platCenterX - iconSz / 2, centerY - Math.round(28 * s), iconSz, iconSz);
 
   // Number
   ctx.save();
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '700 18px Rajdhani, sans-serif';
+  ctx.font = `700 ${fontLg}px Rajdhani, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(String(profile.totalPlatinums), platCenterX, centerY + 2);
+  ctx.fillText(String(profile.totalPlatinums), platCenterX, centerY + Math.round(2 * s));
 
   // Label
   ctx.fillStyle = '#8A9BB8';
-  ctx.font = '500 10px Inter, sans-serif';
-  ctx.fillText('Platinums', platCenterX, centerY + 22);
+  ctx.font = `500 ${fontSm}px Inter, sans-serif`;
+  ctx.fillText('Platinums', platCenterX, centerY + Math.round(22 * s));
   ctx.restore();
 
   curX += platBlockW;
@@ -716,28 +797,30 @@ function drawProfileCard(
   // --- Extra stat section ---
   if (extraStat) {
     // Separator
+    const extraGap = Math.round(12 * s);
     ctx.save();
     ctx.fillStyle = '#1E2740';
-    ctx.fillRect(curX + 12, cardY + 12, 1, cardH - 24);
+    ctx.fillRect(curX + extraGap, cardY + Math.round(12 * s), 1, cardH - Math.round(24 * s));
     ctx.restore();
 
-    const extraCenterX = curX + 12 + 1 + 12 + (extraBlockW - 25) / 2;
+    const extraCenterX = curX + extraGap + 1 + extraGap + (extraBlockW - Math.round(25 * s)) / 2;
+    const starSz = Math.round(14 * s);
 
     // Star icon
-    if (icons.star) ctx.drawImage(icons.star, extraCenterX - 7, centerY - 27, 14, 14);
+    if (icons.star) ctx.drawImage(icons.star, extraCenterX - starSz / 2, centerY - Math.round(27 * s), starSz, starSz);
 
     // Value
     ctx.save();
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '700 18px Rajdhani, sans-serif';
+    ctx.font = `700 ${fontLg}px Rajdhani, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(extraStat.value, extraCenterX, centerY + 2);
+    ctx.fillText(extraStat.value, extraCenterX, centerY + Math.round(2 * s));
 
     // Label
     ctx.fillStyle = '#8A9BB8';
-    ctx.font = '500 10px Inter, sans-serif';
-    ctx.fillText(extraStat.label, extraCenterX, centerY + 22);
+    ctx.font = `500 ${fontSm}px Inter, sans-serif`;
+    ctx.fillText(extraStat.label, extraCenterX, centerY + Math.round(22 * s));
     ctx.restore();
   }
 }
