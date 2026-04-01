@@ -267,7 +267,9 @@ function drawBadgePill(
   const textW = metrics.width;
   const iconW = opts.icon ? (opts.iconSize ?? 10) + 3 : 0;
   const totalW = opts.padX * 2 + textW + iconW;
-  const height = opts.padY * 2 + parseInt(opts.font) * 1.2;
+  const fontSizeMatch = opts.font.match(/(\d+)px/);
+  const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1]) : 12;
+  const height = opts.padY * 2 + fontSize * 1.2;
 
   const bx = opts.align === 'left' ? x : x - totalW;
   const by = y;
